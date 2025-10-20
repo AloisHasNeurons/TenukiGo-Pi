@@ -1,0 +1,13 @@
+# Core Requirements for venv setup
+numpy>=1.20
+opencv-python-headless>=4.5
+# Tensorflow might need specific CPU/GPU versions depending on your hardware
+# See: [https://www.tensorflow.org/install/pip](https://www.tensorflow.org/install/pip)
+tensorflow>=2.10
+# Pytorch is needed by ultralytics. Check installation instructions:
+# [https://pytorch.org/get-started/locally/](https://pytorch.org/get-started/locally/)
+torch>=1.12
+# Ultralytics needs specific versions sometimes, check their repo if issues arise
+ultralytics>=8.0
+sente>=0.6
+scikit-learn>=1.0

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tenukigo_pi"
+version = "0.1.0"
+description = "A Go game SGF recorder built on computer vision, ported to run on embedded systems."
+readme = "README.md"
+authors = [
+    { name = "Aloïs VINCENT", email = "alois.vincent@imt-atlantique.net" },
+    { name = "Etienne BERTIN", email = "etienne.bertin@imt-atlantique.net"},
+    { name = "Kani FOMBA", email = "kani.fomba@imt-atlantique.net"},
+    { name = "Jules SEYA", email = "jules.seya@imt-atlantique.net"},
+    { name = "Xiangyu MAO", email = "xiangyu.mao@imt-atlantique.net"},
+    { name = "Emmanuel KOUASSI", email = "emmanuel.kouassi@imt-atlantique.net"}
+]
+requires-python = ">=3.10"
+
+# --- Runtime Dependencies ---
+dependencies = [
+    "numpy",
+    "opencv-python-headless",
+    "sente",
+    "ultralytics",
+    "tflite-runtime"
+]
+
+[project.optional-dependencies]
+# --- Development Dependencies ---
+# Install with: pip install -e .[dev]
+dev = [
+    "flake8",
+]
+
+[tool.setuptools.packages.find]
+# Tells setuptools to find your package code inside the 'src' directory
+where = ["src"]

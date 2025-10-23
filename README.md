@@ -9,7 +9,7 @@ You can set up this project using either **Micromamba (or conda or mamba) (recom
 
 1.  **Clone the repository:**
     ```bash
-    git clone [your-repo-url]
+    git clone https://github.com/AloisHasNeurons/TenukiGo-Pi.git
     cd TenukiGo-Pi
     ```
 
@@ -41,7 +41,7 @@ Using `venv` requires you to have **Python 3.10 or higher** installed on your sy
 
 1.  **Clone the repository:**
     ```bash
-    git clone [your-repo-url]
+    git clone https://github.com/AloisHasNeurons/TenukiGo-Pi.git
     cd TenukiGo-Pi
     ```
 

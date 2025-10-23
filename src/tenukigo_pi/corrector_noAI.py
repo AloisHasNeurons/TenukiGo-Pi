@@ -82,12 +82,20 @@ Case 4.3 (Capture + 2 Rapid Moves):
 Correction: Interpreted as a capture plus two rapid moves. Add both moves.
 """
 
-import numpy as np
 import itertools
-from .sgf_to_numpy import * # noqa: F403
+import logging
+from typing import Any, Dict, List, Tuple
+
+import numpy as np
+
+logger = logging.getLogger(__name__)
+
+MoveTuple = Tuple[int, int, int]
+DiffDict = Dict[int, Dict[str, List[MoveTuple]]]
 
 
-def differences(prev_board, curr_board):
+def differences(prev_board: np.ndarray,
+                curr_board: np.ndarray) -> Tuple[DiffDict, int]:
     """
     Calculates added and removed stones between two board states.
 
@@ -100,14 +108,15 @@ def differences(prev_board, curr_board):
             - dict: A dictionary with added/removed stones for each player.
             - int: The total number of stones added.
     """
-    black_added = []
-    black_removed = []
-    white_added = []
-    white_removed = []
+    black_added: List[MoveTuple] = []
+    black_removed: List[MoveTuple] = []
+    white_added: List[MoveTuple] = []
+    white_removed: List[MoveTuple] = []
     num_added = 0
+    board_size = prev_board.shape[0]
 
-    for r in range(19):
-        for c in range(19):
+    for r in range(board_size):
+        for c in range(board_size):
             prev_stone = prev_board[r, c]
             curr_stone = curr_board[r, c]
 
@@ -130,23 +139,23 @@ def differences(prev_board, curr_board):
                 black_added.append((r, c, 1))
                 num_added += 1
 
-    diff_data = {
+    diff_data: DiffDict = {
         1: {"add": black_added, "remove": black_removed},
         2: {"add": white_added, "remove": white_removed}
     }
     return diff_data, num_added
 
 
-def get_last_index(move_list, element):
+def get_last_index(move_list: List[Any], element: Any) -> int:
     """Finds the last index of an element in a list."""
-    index = -1
-    for i in range(len(move_list)):
+    for i in reversed(range(len(move_list))):
         if move_list[i] == element:
-            index = i
-    return index
+            return i
+    return -1
 
 
-def distance(list_added, list_removed):
+def distance(list_added: List[MoveTuple],
+             list_removed: List[MoveTuple]) -> int:
     """Calculates the total Manhattan distance between two lists of moves."""
     dist = 0
     for i in range(len(list_added)):
@@ -155,7 +164,8 @@ def distance(list_added, list_removed):
     return dist
 
 
-def opt_permutation(list_added, list_removed):
+def opt_permutation(list_added: List[MoveTuple],
+                    list_removed: List[MoveTuple]) -> List[MoveTuple]:
     """
     Finds the permutation of added stones that is "closest" to the
     list of removed stones, minimizing total Manhattan distance.
@@ -163,15 +173,16 @@ def opt_permutation(list_added, list_removed):
     """
     d_opt = np.inf
     list_added_permut_opt = list_added
+
     for list_added_permut in list(itertools.permutations(list_added)):
-        d_curr = distance(list_added_permut, list_removed)
+        d_curr = distance(list(list_added_permut), list_removed)
         if d_curr < d_opt:
-            list_added_permut_opt = list_added_permut
+            list_added_permut_opt = list(list_added_permut)
             d_opt = d_curr
     return list_added_permut_opt
 
 
-def corrector_no_ai(board_states):
+def corrector_no_ai(board_states: List[np.ndarray]) -> List[MoveTuple]:
     """
     Reconstructs a move list from a sequence of board states using heuristics.
 
@@ -183,9 +194,7 @@ def corrector_no_ai(board_states):
         list: A list of moves, where each move is a tuple
               (row, col, player_num).
     """
-    move_list = []
-    # move_list[i] = (row, col, player_num)
-    # player_num: 1 for Black, 2 for White
+    move_list: List[MoveTuple] = []
     num_frames = len(board_states)
 
     turn = 1  # 1 = Black's turn, 2 = White's turn
@@ -213,10 +222,10 @@ def corrector_no_ai(board_states):
             # Swap turns for the next iteration
             turn, not_turn = not_turn, turn
 
-        elif len(added_turn_player) == len(added_not_turn_player) and \
-                len(added_turn_player) >= 1:
+        elif (len(added_turn_player) == len(added_not_turn_player) and
+                len(added_turn_player) >= 1):
             # Case 1.2 (e.g., B:1, W:1)
-            print(f"Frame {index}: Detected rapid moves.")
+            logger.info(f"Frame {index}: Detected rapid moves.")
             for k in range(len(added_not_turn_player)):
                 move_list.append(added_turn_player[k])
                 move_list.append(added_not_turn_player[k])
@@ -225,10 +234,10 @@ def corrector_no_ai(board_states):
             # CASE 3: Displaced stones
             # Check for displacement by the player whose turn it is
             removed_turn_player = diff_data[turn]["remove"]
-            if len(added_turn_player) == len(removed_turn_player) and \
-                    len(added_turn_player) > 0:
+            if (len(added_turn_player) == len(removed_turn_player) and
+                    len(added_turn_player) > 0):
                 list_added_opt = opt_permutation(added_turn_player,
-                                                   removed_turn_player)
+                                                 removed_turn_player)
                 for i in range(len(list_added_opt)):
                     (r, c, p) = removed_turn_player[i]
                     idx = get_last_index(move_list, (r, c, p))
@@ -237,10 +246,10 @@ def corrector_no_ai(board_states):
 
             # Check for displacement by the player whose turn it isn't
             removed_not_turn_player = diff_data[not_turn]["remove"]
-            if len(added_not_turn_player) == len(removed_not_turn_player) and \
-                    len(added_not_turn_player) > 0:
+            if (len(added_not_turn_player) == len(removed_not_turn_player) and
+                    len(added_not_turn_player) > 0):
                 list_added_opt = opt_permutation(added_not_turn_player,
-                                                   removed_not_turn_player)
+                                                 removed_not_turn_player)
                 for i in range(len(list_added_opt)):
                     (r, c, p) = removed_not_turn_player[i]
                     idx = get_last_index(move_list, (r, c, p))

@@ -27,6 +27,9 @@ develop-eggs/
 pkgs/
 
 # Output files
+data/
+outputs/
 *.sgf
 *.mp4
 *.h264
+debug_*

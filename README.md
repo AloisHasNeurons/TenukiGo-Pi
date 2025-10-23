@@ -9,7 +9,7 @@ This project uses **Micromamba (or conda/mamba)** for environment management. Th
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/AloisHasNeurons/TenukiGo-Pi.git](https://github.com/AloisHasNeurons/TenukiGo-Pi.git)
+    git clone https://github.com/AloisHasNeurons/TenukiGo-Pi.git
     cd TenukiGo-Pi
     ```
 

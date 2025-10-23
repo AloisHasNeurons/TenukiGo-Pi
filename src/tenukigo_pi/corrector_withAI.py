@@ -1,36 +1,60 @@
-# import numpy as np
-from .sgf_to_numpy import *  # noqa: F403
-from .Fill_gaps_model import fill_gaps, get_possible_moves
+"""
+AI-Assisted SGF Corrector.
+
+This module uses a hybrid approach to reconstruct a Go game's move list
+from a sequence of board states.
+
+It first uses fast heuristics (from corrector_noAI) to find simple,
+unambiguous moves. When it encounters an ambiguous state (e.g.,
+multiple stones appearing at once), it invokes an AI model
+(from model_utils) to predict the most likely sequence of moves
+within that "gap".
+"""
+
+import logging
+from typing import List, Tuple
+
+import keras
+import numpy as np
+
 from .corrector_noAI import differences
+from .utils.model_utils import fill_gaps, get_possible_moves
+
+logger = logging.getLogger(__name__)
+MoveTuple = Tuple[int, int, int]
 
 
-def corrector_with_ai(board_states, corrector_model):
+def corrector_with_ai(board_states: List[np.ndarray],
+                      corrector_model: keras.Model) -> List[MoveTuple]:
     """
     Reconstructs a move list from board states, using an AI model
     to fill gaps when simple heuristics fail.
 
     Args:
-        board_states (list): A list of 19x19 numpy arrays representing
-                             the board at each frame.
-        corrector_model (keras.Model): The pre-loaded Keras model
-                                       used for gap filling.
+        board_states (List[np.ndarray]): A list of 19x19 board states.
+        corrector_model (keras.Model): The loaded Keras model for gap filling.
 
     Returns:
-        list: A list of moves, where each move is a tuple
-              (row, col, player_num).
+        List[MoveTuple]: The reconstructed list of moves (row, col, player).
     """
-    move_list = []
-    # move_list[i] = (row, col, player_num)
-    # player_num: 1 for Black, 2 for White
-    num_frames = len(board_states)
+    # Create a copy to avoid modifying the original list
+    board_states_list = board_states.copy()
+    move_list: List[MoveTuple] = []
+    num_frames = len(board_states_list)
 
     turn = 1  # 1 = Black's turn, 2 = White's turn
     not_turn = 2
     index = 1
 
-    while index < num_frames:
-        diff_data, num_added = differences(board_states[index - 1],
-                                           board_states[index])
+    # Add safety counter to prevent infinite loops
+    max_iterations = len(board_states_list) * 10  # Reasonable upper bound
+    iterations = 0
+
+    while index < num_frames and iterations < max_iterations:
+        iterations += 1
+
+        diff_data, num_added = differences(board_states_list[index - 1],
+                                           board_states_list[index])
 
         if num_added == 0:
             # No stones added, likely a capture or no change.
@@ -44,48 +68,66 @@ def corrector_with_ai(board_states, corrector_model):
         if len(added_turn_player) == 1 and len(added_not_turn_player) == 0:
             move = added_turn_player[0]
             move_list.append(move)
-            print(f"Player {turn} played at {move}")
+            logger.debug(f"Player {turn} played at {move}")
 
             # Swap turns for the next iteration
             turn, not_turn = not_turn, turn
             index += 1
 
-        # CASE 2: No moves detected (already handled, but for clarity)
+        # CASE 2: No moves detected (already handled by num_added == 0)
         elif len(added_turn_player) == 0 and len(added_not_turn_player) == 0:
             index += 1
             continue
 
-        # CASE 3: Ambiguous state (e.g., multiple stones, wrong player)
-        # This is where the AI model is needed.
+        # CASE 3: Ambiguous state - use AI to fill gaps
         else:
-            # We found an ambiguous state. We assume a gap exists between
-            # frame [index-1] (last good state) and [index] (bad state).
-            # We need to find the *next* good state to define the gap.
-            # This implementation assumes the *next* frame [index] is the
-            # end of the gap, which is a simplification.
-            # A more robust implementation would search forward.
+            # Check if we're at the end of the sequence
+            if index + 1 >= num_frames:
+                logger.warning("Reached end of sequence at "
+                               "ambiguous state, skipping.")
+                index += 1
+                continue
 
-            # Let's re-use the original logic:
-            # Insert a copy of the bad frame.
-            board_states.insert(index, board_states[index].copy())
-            num_frames = len(board_states)
+            # Insert a copy of the current state to create gap frame
+            board_states_list.insert(index, board_states_list[index].copy())
+            num_frames = len(board_states_list)
 
             # Define the gap as being between [index-1] and [index+1]
-            b_moves, w_moves = get_possible_moves(board_states[index - 1],
-                                                  board_states[index + 1])
+            b_moves, w_moves = get_possible_moves(board_states_list[index - 1],
+                                                  board_states_list[index + 1])
+
+            logger.info(f"Filling gap between frames {index-1} and {index+1}")
+            logger.info(f"Black possible moves: {len(b_moves)}, "
+                        f"White possible moves: {len(w_moves)}")
 
             # Call the AI to fill the gap
-            board_states = fill_gaps(model=corrector_model,
-                                     sequence_with_gap=board_states,
-                                     gap_start=index,
-                                     gap_end=index + 2,
-                                     black_possible_moves=b_moves,
-                                     white_possible_moves=w_moves)
+            try:
+                board_states_list = fill_gaps(
+                    model=corrector_model,
+                    sequence_with_gap=board_states_list,
+                    gap_start=index,
+                    gap_end=index + 2,  # Fill 2 frames: index and index+1
+                    black_possible_moves=b_moves,
+                    white_possible_moves=w_moves
+                )
 
-            # Update num_frames in case fill_gaps modified the list length
-            num_frames = len(board_states)
+                # After filling, we've processed the gap,
+                # so advance index past it
+                index += 2
+                # Update num_frames in case fill_gaps modified list length
+                # (though current implementation does not)
+                num_frames = len(board_states_list)
 
-            if num_frames - 1 == index:
-                break
+            except Exception as e:
+                logger.error(f"Error in gap filling: {e}. Skipping gap.")
+                # Remove the inserted frame and continue
+                if len(board_states_list) > index:
+                    board_states_list.pop(index)
+                num_frames = len(board_states_list)
+                index += 1
+
+    if iterations >= max_iterations:
+        logger.warning("Reached maximum iterations (%d). "
+                       "Stopping gap filling.", max_iterations)
 
     return move_list

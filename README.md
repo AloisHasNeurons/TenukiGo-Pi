@@ -1,27 +1,33 @@
 # TenukiGo-Pi
 ## Setup Instructions
 
-You can set up this project using either **Micromamba (or conda or mamba) (recommended)** or Python's built-in **venv**. Micromamba is generally better at handling complex dependencies like OpenCV and PyTorch/TensorFlow across different operating systems.
+This project uses **Micromamba (or conda/mamba)** for environment management. This is the recommended way to ensure complex dependencies like OpenCV and PyTorch are installed correctly.
 
 ---
 
-### Local Setup (Micromamba - Recommended)
+### Local Setup (Micromamba / Conda)
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/AloisHasNeurons/TenukiGo-Pi.git
+    git clone [https://github.com/AloisHasNeurons/TenukiGo-Pi.git](https://github.com/AloisHasNeurons/TenukiGo-Pi.git)
     cd TenukiGo-Pi
     ```
 
-2.  **Create the Micromamba environment:**
+2.  **Create the Micromamba/Conda environment:**
     This command reads the `environment.yml` file and installs all necessary packages.
     ```bash
+    # Using Micromamba (fastest)
     micromamba env create -f environment.yml
+
+    # Or using full Conda
+    conda env create -f environment.yml
     ```
 
 3.  **Activate the environment:**
     ```bash
     micromamba activate tenukigo_pi
+    # Or
+    conda activate tenukigo_pi
     ```
     *(Your terminal prompt should now show `(tenukigo_pi)` at the beginning)*
 
@@ -31,69 +37,35 @@ You can set up this project using either **Micromamba (or conda or mamba) (recom
     pip install -e .
     ```
 
-You are now ready to run the script (see "How to Run" section).
-
----
-
-### Local Setup (venv)
-
-Using `venv` requires you to have **Python 3.10 or higher** installed on your system. You might also need to manually install system-level dependencies for packages like OpenCV depending on your OS.
-
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/AloisHasNeurons/TenukiGo-Pi.git
-    cd TenukiGo-Pi
-    ```
-
-2.  **Create a virtual environment:**
-    Run this command from the project root directory (`TenukiGo-Pi/`). This creates a `venv` folder.
-    ```bash
-    python -m venv venv
-    ```
-
-3.  **Activate the virtual environment:**
-    * **On Linux/macOS:**
-        ```bash
-        source venv/bin/activate
-        ```
-    * **On Windows (Command Prompt/PowerShell):**
-        ```bash
-        .\venv\Scripts\activate
-        ```
-    *(Your terminal prompt should now show `(venv)` at the beginning)*
-
-4.  **Install dependencies using pip:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-5.  **Install the package in editable mode:**
-    This links your `src/` directory.
-    ```bash
-    pip install -e .
-    ```
-
-You are now ready to run the script (see "How to Run" section).
+You are now ready to run the script.
 
 ---
 
 ## How to Run
 
-After completing the setup steps (either Micromamba or venv):
+After completing the setup steps:
 
-1.  **Ensure your environment is active.** Your terminal prompt should show either `(tenukigo_pi)` or `(venv)`. If not, activate it using the commands from the setup section.
+1.  **Ensure your environment is active.** Your terminal prompt should show `(tenukigo_pi)`. If not, activate it.
 
 2.  **Make sure you are in the project root directory** (`TenukiGo-Pi/`).
 
-3.  **Run the main script**, providing the path to your Go game video file using the `--video` argument:
+3.  **(Optional) Place your video file** in the `data/` directory. This keeps the project root clean.
+
+4.  **Run the main script**, providing the path to your Go game video file.
+
+    **Example using the test video:**
     ```bash
-    python scripts/process_video.py --video /path/to/your/game.mp4
+    python scripts/process_video.py --video data/test.mp4
     ```
-    * Replace `/path/to/your/game.mp4` with the actual path to your video.
 
-4.  **Wait for processing.** The script will load the models and process the video frame by frame (based on the `ANALYSIS_INTERVAL` set in the script). You'll see log messages in the terminal.
+    **Example using your own video:**
+    ```bash
+    python scripts/process_video.py --video data/my_game.mp4
+    ```
 
-5.  **Check the output.** Once the script finishes, a file named `game_output.sgf` (or whatever you specify with the `--output` argument) will be created in your project root directory. This file contains the recorded game in SGF format.
+5.  **Wait for processing.** The script will load the models and process the video. You'll see log messages in the terminal.
+
+6.  **Check the output.** Once the script finishes, a file named `game_output.sgf` will be created in the `outputs/` directory. This file contains the recorded game in SGF format.
 
 ### Optional Arguments
 
@@ -103,4 +75,5 @@ After completing the setup steps (either Micromamba or venv):
 
 **Example with options:**
 ```bash
-python scripts/process_video.py --video my_game.mp4 --output results/final_game.sgf
+python scripts/process_video.py --video data/my_game.mp4 --output outputs/final_game.sgf
+```

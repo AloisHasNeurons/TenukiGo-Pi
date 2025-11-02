@@ -190,7 +190,7 @@ def run_pipeline(args: argparse.Namespace):
     # --- 2. Process Video ---
     processed_frames = process_video(cap, go_game)
     cap.release()
-    cv2.destroyAllWindows()
+    # cv2.destroyAllWindows()
 
     # --- 3. Post-Process and Save SGF ---
     final_sgf = None

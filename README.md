@@ -5,8 +5,6 @@
 
 > Automated Go game recording and analysis from video using computer vision and deep learning
 
-Transform your Go game videos into SGF format automatically! TenukiGo-Pi uses state-of-the-art computer vision (YOLO) and deep learning to detect the board, track stone placements, and generate accurate game records.
-
 ---
 
 ## Features
@@ -66,9 +64,11 @@ Choose one of the following:
 
 You are now ready to run the script!
 
+--- 
+
 ### NixOS Setup
 
-> [!Tip]
+> [!TIP]
 > Nix is a package manager that guarantees reproducible builds. It ensures everyone gets the exact same dependencies and environment, making "it works on my machine" problems disappear.
 
 <details>
@@ -96,11 +96,11 @@ This project uses Nix flakes with uv2nix for reproducible Python environments.
    ```bash
    python scripts/process_video.py --video data/test.mp4 --output outputs/final_game.sgf
    ```
-
-> [!Note]
-> The Nix setup uses Python 3.11 and includes special handling for PyTorch/CUDA packages. The `sente` library is automatically patched and installed from source during shell initialization.
-
+   
 </details>
+
+> [!NOTE]
+> The Nix setup uses Python 3.11 and includes special handling for PyTorch/CUDA packages. The `sente` library is automatically patched and installed from source during shell initialization.
 
 ---
 

@@ -1,9 +1,36 @@
 # TenukiGo-Pi
-## Setup Instructions
 
-This project uses **Micromamba (or conda/mamba)** for environment management. This is the recommended way to ensure complex dependencies like OpenCV and PyTorch are installed correctly.
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
+[![Nix Flakes](https://img.shields.io/badge/nix-flakes-blue.svg)](https://nixos.org/)
+
+> Automated Go game recording and analysis from video using computer vision and deep learning
+
+Transform your Go game videos into SGF format automatically! TenukiGo-Pi uses state-of-the-art computer vision (YOLO) and deep learning to detect the board, track stone placements, and generate accurate game records.
 
 ---
+
+## Features
+
+-  **Video Processing**: Automatically process Go game videos from start to finish
+-  **Board Detection**: Robust YOLO-based board and stone detection
+-  **Deep Learning Classification**: Keras model for accurate stone color identification
+-  **SGF Export**: Generate standard SGF files compatible with all Go software
+-  **Flexible Configuration**: Customizable model paths and output locations
+-  **NixOS Support**: Reproducible development environment with Nix flakes
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+Choose one of the following:
+- **Micromamba/Conda** (recommended for most users)
+- **NixOS** with flakes enabled (for reproducible environments)
+
+---
+
+## Setup Instructions
 
 ### Local Setup (Micromamba / Conda)
 
@@ -37,7 +64,43 @@ This project uses **Micromamba (or conda/mamba)** for environment management. Th
     pip install -e .
     ```
 
-You are now ready to run the script.
+You are now ready to run the script!
+
+### NixOS Setup
+
+> [!Tip]
+> Nix is a package manager that guarantees reproducible builds. It ensures everyone gets the exact same dependencies and environment, making "it works on my machine" problems disappear.
+
+<details>
+<summary><b>Click to expand installation instructions</b></summary>
+
+This project uses Nix flakes with uv2nix for reproducible Python environments.
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/AloisHasNeurons/TenukiGo-Pi.git
+   cd TenukiGo-Pi
+   ```
+
+2. **Enter the development environment:**
+   ```bash
+   nix develop
+   ```
+
+   This will:
+   - Create a virtual environment in `.venv/` with all dependencies from `uv.lock`
+   - Clone and patch the `sente` library with necessary fixes
+   - Provide all required build tools and Python packages
+
+3. **The virtual environment is automatically activated.** You can now run scripts directly:
+   ```bash
+   python scripts/process_video.py --video data/test.mp4 --output outputs/final_game.sgf
+   ```
+
+> [!Note]
+> The Nix setup uses Python 3.11 and includes special handling for PyTorch/CUDA packages. The `sente` library is automatically patched and installed from source during shell initialization.
+
+</details>
 
 ---
 
@@ -45,7 +108,7 @@ You are now ready to run the script.
 
 After completing the setup steps:
 
-1.  **Ensure your environment is active.** Your terminal prompt should show `(tenukigo_pi)`. If not, activate it.
+1.  **Ensure your environment is active.** Your terminal prompt should show `(tenukigo_pi)` for Conda/Micromamba, or `(.venv)` for Nix. If not, activate it.
 
 2.  **Make sure you are in the project root directory** (`TenukiGo-Pi/`).
 
@@ -53,14 +116,9 @@ After completing the setup steps:
 
 4.  **Run the main script**, providing the path to your Go game video file.
 
-    **Example using the test video:**
+    **Example using a test video:**
     ```bash
     python scripts/process_video.py --video data/test.mp4
-    ```
-
-    **Example using your own video:**
-    ```bash
-    python scripts/process_video.py --video data/my_game.mp4
     ```
 
 5.  **Wait for processing.** The script will load the models and process the video. You'll see log messages in the terminal.
@@ -76,4 +134,20 @@ After completing the setup steps:
 **Example with options:**
 ```bash
 python scripts/process_video.py --video data/my_game.mp4 --output outputs/final_game.sgf
+```
+
+---
+
+## Project Structure
+
+```
+TenukiGo-Pi/
+├── data/              # Input video files
+├── outputs/           # Generated SGF files
+├── scripts/           # Main processing scripts
+├── src/               # Source code modules
+├── models/            # Trained YOLO and Keras models
+├── environment.yml    # Conda environment specification
+├── flake.nix          # Nix flake for reproducible builds
+└── uv.lock            # Locked Python dependencies
 ```

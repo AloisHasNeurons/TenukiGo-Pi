@@ -37,22 +37,16 @@
         python = pkgs.python311;
 
         # Load the workspace from uv.lock
-        # This reads the lock file and creates a structured representation
-        # of all dependencies with their exact versions
         workspace = uv2nix.lib.workspace.loadWorkspace {
           workspaceRoot = ./.;
         };
 
         # Create overlay from workspace
-        # sourcePreference = "wheel" means we prefer pre-built wheels over source distributions
-        # This is faster and more reliable for packages with complex build requirements
         overlay = workspace.mkPyprojectOverlay {
           sourcePreference = "wheel";
         };
 
         # Helper function to patch NVIDIA CUDA packages
-        # These packages often have missing dependencies that don't affect runtime
-        # autoPatchelfIgnoreMissingDeps = true prevents build failures from these
         patchNvidiaPackage = name: prev:
           if prev ? ${name} then {
             ${name} = prev.${name}.overrideAttrs (old: {
@@ -61,28 +55,16 @@
           } else {};
 
         # Create a Python package set with all dependencies from uv.lock
-        # This combines multiple overlays to:
-        # 1. Add standard build systems (setuptools, etc.)
-        # 2. Add our workspace dependencies from uv.lock
-        # 3. Replace opencv-python with opencv-python-headless (no GUI dependencies)
-        # 4. Patch NVIDIA CUDA packages to ignore missing ELF dependencies
         pythonSet =
           (pkgs.callPackage pyproject-nix.build.packages {
             inherit python;
           }).overrideScope
             (pkgs.lib.composeManyExtensions [
-              # Add standard Python build systems
               pyproject-build-systems.overlays.default
-              # Add dependencies from uv.lock
               overlay
-              # Force opencv-python to use the headless variant
-              # This avoids pulling in X11 and GUI libraries
               (final: prev: {
                 "opencv-python" = final."opencv-python-headless";
               })
-              # Patch all NVIDIA CUDA packages to ignore missing dependencies
-              # This is necessary because NVIDIA packages often reference libraries
-              # that aren't needed in practice but cause autoPatchelf to fail
               (final: prev:
                 pkgs.lib.foldl' (acc: name: acc // (patchNvidiaPackage name prev)) {} [
                   "torch"
@@ -104,91 +86,185 @@
             ]);
 
         # Resolve the virtual environment's dependencies
-        # This returns a list of Nix derivations for all packages in the workspace
         nixBuiltPythonDeps = pythonSet.resolveVirtualEnv workspace.deps.default;
+
+        # Common shell hook for sente patching
+        commonSenteSetup = ''
+          SENTE_SRC_DIR=".venv/sente-src"
+
+          echo "---"
+          echo "Cloning and patching 'sente' source..."
+
+          if [ ! -d "$SENTE_SRC_DIR" ]; then
+            git clone https://github.com/atw1020/sente.git "$SENTE_SRC_DIR"
+          else
+            echo "Source directory already exists, skipping clone."
+          fi
+
+          # Patch setup.py and C++ files
+          sed -i 's/">=3.8.*"/">=3.8"/' "$SENTE_SRC_DIR/setup.py"
+          sed -i '1s;^;#include <algorithm>\n;' "$SENTE_SRC_DIR/src/Utils/Tree.h"
+          sed -i '1s;^;#include <algorithm>\n;' "$SENTE_SRC_DIR/src/Utils/SGF/SGFNode.cpp"
+          echo "Patched setup.py and C++ source files."
+
+          echo "Installing 'sente' from patched local source..."
+          "$VENV_DIR/bin/pip" install --no-cache-dir --no-deps "$SENTE_SRC_DIR"
+          echo "Done."
+          echo "---"
+        '';
 
       in
       {
-        # Default development shell
-        # Usage: nix develop
-        devShells.default = pkgs.mkShell {
-          packages = [
-            # uv for managing Python dependencies
-            pkgs.uv
+        devShells = {
+          # Development shell - Uses editable install from ./src
+          # This is the default when you run: nix develop
+          default = pkgs.mkShell {
+            packages = [
+              pkgs.uv
+              python
+              python.pkgs.pip
+              pkgs.meson
+              pkgs.ninja
+              pkgs.gcc
+              pkgs.git
+            ]
+            ++ nixBuiltPythonDeps;
 
-            # Python interpreter and pip
-            python
-            python.pkgs.pip
+            shellHook = ''
+              VENV_DIR=".venv"
 
-            # Build tools required for compiling Python packages with C extensions
-            pkgs.meson
-            pkgs.ninja
-            pkgs.gcc
-            pkgs.git
-          ]
-          # Add all Python packages from uv.lock
-          ++ nixBuiltPythonDeps;
+              # Detect and remove broken venvs
+              if [ -d "$VENV_DIR" ] && [ ! -f "$VENV_DIR/bin/pip" ]; then
+                echo "---"
+                echo "Broken venv detected (missing pip). Removing $VENV_DIR..."
+                rm -rf "$VENV_DIR"
+                echo "Done."
+                echo "---"
+              fi
 
-          # Shell hook runs when entering the development environment
-          # It creates a virtual environment with --system-site-packages to access
-          # the Nix-built packages, then installs 'sente' from a patched local clone
-          shellHook = ''
-            VENV_DIR=".venv"
-            SENTE_SRC_DIR=".venv/sente-src"
+              # Create venv with system-site-packages
+              if [ ! -d "$VENV_DIR" ]; then
+                echo "---"
+                echo "Creating new development venv in $VENV_DIR..."
+                ${python.interpreter} -m venv $VENV_DIR --system-site-packages
+                echo "Done."
+                echo "---"
+              fi
 
-            # Detect and remove broken venvs (e.g., if pip is missing)
-            # This can happen if the venv was created with a different Python version
-            if [ -d "$VENV_DIR" ] && [ ! -f "$VENV_DIR/bin/pip" ]; then
+              source "$VENV_DIR/bin/activate"
+
+              # Install project in editable mode
               echo "---"
-              echo "Broken venv detected (missing pip). Removing $VENV_DIR..."
-              rm -rf "$VENV_DIR"
+              echo "Installing tenukigo_pi in editable mode..."
+              pip install -e . --no-deps
               echo "Done."
               echo "---"
-            fi
 
-            # Create virtual environment with --system-site-packages
-            # This allows the venv to access Nix-built packages while still
-            # supporting pip install for packages not in uv.lock
-            if [ ! -d "$VENV_DIR" ]; then
+              ${commonSenteSetup}
+
+              echo "Development shell activated"
+              echo "   - tenukigo_pi: editable install from ./src"
+              echo "   - Dependencies: from Nix store"
+              echo "   - Changes to src/ are immediately available"
+            '';
+          };
+
+          # Production/deployment shell - Uses frozen Nix packages
+          # Use with: nix develop .#prod
+          prod = pkgs.mkShell {
+            packages = [
+              pkgs.uv
+              python
+              python.pkgs.pip
+              pkgs.meson
+              pkgs.ninja
+              pkgs.gcc
+              pkgs.git
+            ]
+            ++ nixBuiltPythonDeps;
+
+            shellHook = ''
+              VENV_DIR=".venv"
+
+              if [ -d "$VENV_DIR" ] && [ ! -f "$VENV_DIR/bin/pip" ]; then
+                echo "---"
+                echo "Broken venv detected (missing pip). Removing $VENV_DIR..."
+                rm -rf "$VENV_DIR"
+                echo "Done."
+                echo "---"
+              fi
+
+              if [ ! -d "$VENV_DIR" ]; then
+                echo "---"
+                echo "Creating new production venv in $VENV_DIR..."
+                ${python.interpreter} -m venv $VENV_DIR --system-site-packages
+                echo "Done."
+                echo "---"
+              fi
+
+              source "$VENV_DIR/bin/activate"
+
+              ${commonSenteSetup}
+
+              echo "Production shell activated"
+              echo "   - tenukigo_pi: from Nix store (frozen)"
+              echo "   - Dependencies: from Nix store"
+              echo "   - Reproducible deployment environment"
+            '';
+          };
+
+          # Raspberry Pi optimized shell - Lightweight, no CUDA
+          # Use with: nix develop .#rpi
+          rpi = pkgs.mkShell {
+            packages = [
+              pkgs.uv
+              python
+              python.pkgs.pip
+              pkgs.meson
+              pkgs.ninja
+              pkgs.gcc
+              pkgs.git
+            ]
+            # Note: You'd need to create a separate pythonSetRPi without CUDA
+            # For now, using same deps but with environment variables
+            ++ nixBuiltPythonDeps;
+
+            shellHook = ''
+              VENV_DIR=".venv"
+
+              if [ ! -d "$VENV_DIR" ]; then
+                echo "---"
+                echo "Creating new RPi venv in $VENV_DIR..."
+                ${python.interpreter} -m venv $VENV_DIR --system-site-packages
+                echo "Done."
+                echo "---"
+              fi
+
+              source "$VENV_DIR/bin/activate"
+
+              # Install project in editable mode
               echo "---"
-              echo "Creating new venv in $VENV_DIR..."
-              ${python.interpreter} -m venv $VENV_DIR --system-site-packages
+              echo "Installing tenukigo_pi in editable mode..."
+              pip install -e . --no-deps
               echo "Done."
               echo "---"
-            fi
 
-            # Activate the virtual environment
-            source "$VENV_DIR/bin/activate"
+              ${commonSenteSetup}
 
-            echo "---"
-            echo "Cloning and patching 'sente' source..."
+              # Set environment variables for RPi optimization
+              export OPENBLAS_NUM_THREADS=4
+              export OMP_NUM_THREADS=4
+              export MKL_NUM_THREADS=4
 
-            # Clone the sente repository if not already present
-            # sente is a Python library for Go (the board game) analysis
-            if [ ! -d "$SENTE_SRC_DIR" ]; then
-              git clone https://github.com/atw1020/sente.git "$SENTE_SRC_DIR"
-            else
-              echo "Source directory already exists, skipping clone."
-            fi
+              # Disable CUDA
+              export CUDA_VISIBLE_DEVICES=""
 
-            # Patch 1: Fix setup.py to allow Python 3.8+
-            # Original setup.py has a malformed version specifier
-            sed -i 's/">=3.8.*"/">=3.8"/' "$SENTE_SRC_DIR/setup.py"
-            echo "Patched setup.py."
-
-            # Patch 2: Fix C++ compilation errors
-            # The source files use std::max_element without including <algorithm>
-            sed -i '1s;^;#include <algorithm>\n;' "$SENTE_SRC_DIR/src/Utils/Tree.h"
-            sed -i '1s;^;#include <algorithm>\n;' "$SENTE_SRC_DIR/src/Utils/SGF/SGFNode.cpp"
-            echo "Patched C++ source files."
-
-            echo "Installing 'sente' from patched local source..."
-            # Install using --no-deps because dependencies are already provided by Nix
-            # --no-cache-dir ensures we always use our patched version
-            "$VENV_DIR/bin/pip" install --no-cache-dir --no-deps "$SENTE_SRC_DIR"
-            echo "Done."
-            echo "---"
-          '';
+              echo "Raspberry Pi shell activated"
+              echo "   - tenukigo_pi: editable install from ./src"
+              echo "   - CPU-only mode (CUDA disabled)"
+              echo "   - Thread limits set for RPi"
+            '';
+          };
         };
       });
 }

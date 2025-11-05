@@ -30,5 +30,8 @@ dev = [
 
 [build-system]
 # We don't need poetry-core anymore, but 'uv' understands this.
-requires = ["setuptools"]
+requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -162,14 +162,25 @@ class GoGame:
             return self.go_visual.current_position(), self.get_sgf()
 
     def copy_board_to_numpy(self):
-        """Convert board state to numpy array and store if different."""
-        # state is (row, col, (B, W))
-        _ = self.board_detect.get_state()
-        # final_board is (row, col) with 0, 1, 2
+        """Convert board state to numpy array and store if meaningfully different."""
         final_board = self.board_detect.state_to_array()
 
-        if not self.numpy_board or np.any(final_board != self.numpy_board[-1]):
+        if not self.numpy_board:
+            # First state, always save
             self.numpy_board.append(final_board)
+            logger.info("Saved initial board state")
+            return
+
+        # Check if state actually changed (count stones)
+        prev_stones = np.sum(self.numpy_board[-1] > 0)
+        curr_stones = np.sum(final_board > 0)
+
+        # Only save if stone count changed (new move detected)
+        if curr_stones != prev_stones:
+            self.numpy_board.append(final_board)
+            logger.info(f"Saved board state: {prev_stones} → {curr_stones} stones")
+        else:
+            logger.debug(f"Skipped duplicate state ({curr_stones} stones)")
 
     def transparent_mode_moves(self) -> np.ndarray:
         """Retrieve current board state for post-processing."""

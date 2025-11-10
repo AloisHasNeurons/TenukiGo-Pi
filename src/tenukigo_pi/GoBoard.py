@@ -137,7 +137,7 @@ class GoBoard:
     def process_frame(self, frame):
         """Run full detection pipeline on a single frame."""
         self.frame = frame
-        self.results = self.model(self.frame, verbose=False, conf=0.15)
+        self.results = self.model(self.frame, verbose=False, conf=0.10)
         self.apply_perspective_transformation(double_transform=False)
 
         vertical_lines, horizontal_lines = detect_lines(

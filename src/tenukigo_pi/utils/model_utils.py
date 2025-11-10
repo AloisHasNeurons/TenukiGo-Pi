@@ -91,6 +91,8 @@ def fill_gaps(model: keras.Model,
               white_possible_moves: List[Tuple[int, int]]) -> List[np.ndarray]:
     """
     Fill the gaps in a sequence using the AI model to pick the best move.
+
+    IMPROVED: Better turn detection based on stone count parity
     """
     filled_sequence = sequence_with_gap.copy()
 
@@ -99,26 +101,32 @@ def fill_gaps(model: keras.Model,
         logger.error(f"Invalid gap range: {gap_start} to {gap_end}")
         return filled_sequence
 
-    # Determine current player based on the last move *before* the gap.
-    if gap_start >= 2:
-        state_before_gap_1 = filled_sequence[gap_start - 1]
-        state_before_gap_2 = filled_sequence[gap_start - 2]
-        difference = state_before_gap_1 - state_before_gap_2
+    # Determine current player based on total stones in the board BEFORE the gap
+    state_before_gap = filled_sequence[gap_start - 1] if gap_start > 0 else np.zeros((19, 19))
+    total_stones_before = np.sum(state_before_gap > 0)
 
-        # If diff=1, Black just played, so current_player is White (2).
-        # Otherwise, it's Black's turn (1).
-        current_player = 2 if np.any(difference == 1) else 1
-    else:
-        # Default to Black if we don't have enough history
-        current_player = 1
+    # Black plays on odd total stone counts (1st, 3rd, 5th...)
+    # White plays on even total stone counts (2nd, 4th, 6th...)
+    # If total stones is 0 (empty board), Black starts (player 1)
+    current_player = 1 if total_stones_before % 2 == 0 else 2
+
+    logger.info(f"Gap starts at {total_stones_before} stones, "
+                f"starting with player {current_player} "
+                f"({'Black' if current_player == 1 else 'White'})")
 
     black_moves = black_possible_moves.copy()
     white_moves = white_possible_moves.copy()
 
-    logger.info(f"Filling gap from {gap_start} to {gap_end}, "
-                f"starting with player {current_player}")
+    # Safety counter to prevent infinite loops
+    max_iterations = len(filled_sequence) * 10
+    iterations = 0
 
     for gap_index in range(gap_start, gap_end):
+        iterations += 1
+        if iterations >= max_iterations:
+            logger.warning(f"Reached maximum iterations ({max_iterations})")
+            break
+
         current_board_state = filled_sequence[gap_index - 1]
         possible_moves = black_moves if current_player == 1 else white_moves
 
@@ -129,15 +137,31 @@ def fill_gaps(model: keras.Model,
         ]
 
         if not valid_moves:
-            logger.warning(
-                f"No valid moves for player {current_player} at "
-                f"gap index {gap_index}. Using fallback (copying state)."
-            )
-            # Fallback: copy previous state and try to continue
-            filled_sequence[gap_index] = current_board_state.copy()
-            # Switch player and continue
-            current_player = 3 - current_player
-            continue
+            # No valid moves for current player
+            # Check if other player has moves
+            other_player = 3 - current_player
+            other_moves = white_moves if other_player == 2 else black_moves
+            other_valid_moves = [
+                move for move in other_moves
+                if current_board_state[move[0], move[1]] == 0
+            ]
+
+            if other_valid_moves:
+                # Switch player and try again
+                logger.info(f"No valid moves for player {current_player}, "
+                           f"switching to player {other_player}")
+                current_player = other_player
+                possible_moves = other_moves
+                valid_moves = other_valid_moves
+            else:
+                # No moves for either player - copy state and continue
+                logger.warning(
+                    f"No valid moves for either player at gap index {gap_index}. "
+                    f"Using fallback (copying state)."
+                )
+                filled_sequence[gap_index] = current_board_state.copy()
+                current_player = 3 - current_player
+                continue
 
         candidate_boards = []
         candidate_moves = []
@@ -177,7 +201,8 @@ def fill_gaps(model: keras.Model,
 
             logger.debug(
                 f"Filled gap {gap_index}: "
-                f"Player {current_player} at {best_move}"
+                f"Player {current_player} ({'Black' if current_player == 1 else 'White'}) "
+                f"at {best_move}"
             )
 
         except Exception as e:
@@ -188,7 +213,7 @@ def fill_gaps(model: keras.Model,
             x, y = best_move
             filled_sequence[gap_index] = current_board_state.copy()
             filled_sequence[gap_index][x, y] = current_player
-            # Ensure move is removed from list even in fallback
+
             if current_player == 1:
                 if best_move in black_moves:
                     black_moves.remove(best_move)
@@ -197,6 +222,6 @@ def fill_gaps(model: keras.Model,
                     white_moves.remove(best_move)
 
         # Switch player for the next move
-        current_player = 3 - current_player  # 1 -> 2, 2 -> 1
+        current_player = 3 - current_player
 
     return filled_sequence

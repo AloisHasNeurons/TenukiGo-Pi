@@ -33,3 +33,8 @@ outputs/
 *.mp4
 *.h264
 debug_*
+
+#  Model conversion artifacts
+*.onnx
+*.npy
+*.tflite

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mode Photo</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='photoStyle.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+<body>
+    <header>
+        <img src="{{ url_for('static', filename='Logo_Tanuki_gris.png') }}" class="logo" alt="Logo de l'association">
+    </header>
+
+    <main>
+        <div class="upload-box">
+            <h2>Déposer vos fichiers</h2>
+            <form method="POST" action="/uploadImg" enctype="multipart/form-data">
+                <input type="file" name="images" multiple>
+                <br>
+                <h2>Générer le fichier SGF de la partie</h2>
+                <button class="btn" type="submit">Générer le SGF</button>
+            </form>
+        </div>
+
+        <h2>Télécharger le sgf de la partie</h2>
+        <button class="btn" onclick="downloadFile()">Télécharger le SGF</button>
+
+    </main>
+
+    <footer>
+        <a class="btn" href="{{ url_for('home') }}">Retour</a>
+    </footer>
+
+    <script>
+        function downloadFile() {
+            // Requête AJAX pour obtenir le contenu du fichier depuis le serveur
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/get_sgf_photo', true);
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    // Créer un blob avec le contenu du fichier
+                    var blob = new Blob([xhr.responseText], { type: 'text/plain' });
+                    
+                    // Utiliser FileSaver.js pour télécharger le fichier
+                    saveAs(blob, 'partie.sgf');
+                }
+            };
+            xhr.send();
+        }
+    </script>
+</body>
+</html>

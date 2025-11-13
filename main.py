@@ -16,6 +16,8 @@ import torch.nn
 
 import recup_os
 
+from sgf_sender import run_websocket_in_thread
+
 #cam_index = 0
 def find_camera_index():
     index = 0
@@ -69,17 +71,16 @@ def New_game(transparent_mode=False):
 
 def processing_thread():
     """
-        Process the detection algorithm
-        
-        Update:
-            game_plot, sgf_text
-        Send error to message if there is one
-        """
-    
-    global ProcessFrame, game_plot, message, initialized, sgf_text
+    Process the detection algorithm
+    ...
+    """
+    global ProcessFrame, game_plot, message, initialized, sgf_text, go_game # Ajoutez go_game ici
 
     if not ProcessFrame is None:
         try:
+            # Stocker l'ancien SGF pour comparaison
+            old_sgf = sgf_text 
+
             if not initialized:
                 game_plot, sgf_text = go_game.initialize_game(ProcessFrame, endGame)
                 initialized = True
@@ -87,6 +88,16 @@ def processing_thread():
             else:    
                 game_plot, sgf_text = go_game.main_loop(ProcessFrame, endGame)
                 message = usual_message
+
+            # --- DÉBUT DE L'INTÉGRATION ---
+            # Si le SGF a été mis à jour (un nouveau coup a été joué)
+            if sgf_text != old_sgf and sgf_text is not None:
+                print("Nouveau coup détecté, envoi au serveur...")
+                # Nous devons utiliser un thread pour ne pas bloquer le flux vidéo
+                # (car la fonction d'envoi est 'async')
+                threading.Thread(target=run_websocket_in_thread, args=(sgf_text,)).start()
+            # --- FIN DE L'INTÉGRATION ---
+
         except Exception as e:
             message = "Erreur : "+str(e)
                 

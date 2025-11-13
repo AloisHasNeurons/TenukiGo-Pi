@@ -19,3 +19,6 @@ torchvision==0.20.0
 # 2. Outils de conversion (versions plus anciennes compatibles)
 onnx-tf==1.10.0
 onnx==1.10.2
+
+# 3. Pour envoyer le SGF au serveur FastAPI
+websockets==15.0.1

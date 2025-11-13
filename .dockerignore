@@ -1,0 +1,27 @@
+__pycache__/
+
+.vscode
+
+# Ignorer le .venv local
+.venv/
+
+# Ignorer les dossiers de Git
+.git/
+.gitignore
+
+# Ignorer la documentation et les fonctionnalités non utilisées
+Annex/
+Post_treatment_AI/
+Post_treatment_Algo/
+GoPhoto.py
+
+# Ignorer les fichiers de test
+Historique_test_js.html
+historiquejs.js
+
+# Ignorer les fichiers de conversion
+model.onnx
+convert_to_tflite.py
+
+# Ignorer l'ancien requirements
+requirements.txt

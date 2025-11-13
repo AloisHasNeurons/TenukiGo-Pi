@@ -15,3 +15,6 @@ numpy<2
 opencv-python==4.10.0.84
 sente==0.4.2
 sgf==0.5
+
+# DÉPENDANCE DE DÉTECTION
+scikit-learn

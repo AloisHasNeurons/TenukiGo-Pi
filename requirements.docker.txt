@@ -1,19 +1,23 @@
-# Pour dire à pip d'utiliser les paquets pré-compilés pour Raspberry Pi
---extra-index-url https://www.piwheels.org/simple/
+# Fichier pour Docker sur Raspberry Pi 64-bit (arm64)
+# Pas besoin de piwheels, le dépôt PyPI standard supporte arm64.
 
 # 1. Dépendances de l'IA (Torch & Ultralytics)
-torch==2.1.0
-torchvision==0.16.0
+torch
+torchvision
 ultralytics==8.0.206
 
-# 2. Dépendances du serveur web (local)
+# 2. Dépendances du serveur web
 Flask==3.1.0
 numpy<2
 
 # 3. Dépendances de l'application
+# On utilise "headless" car le serveur n'a pas d'écran
 opencv-python-headless==4.10.0.84
 sente==0.4.2
 sgf==0.5
 
-# 4. Pour envoyer le SGF au serveur FastAPI
+# 4. Communication
 websockets
+
+# 5. DÉPENDANCE DE DÉTECTION
+scikit-learn

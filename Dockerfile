@@ -12,8 +12,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libopenblas-base \
     libopenjp2-7 \
     libtiff5 \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
     && rm -rf /var/lib/apt/lists/*
-
+    
 # Étape 3: Installer les dépendances Python
 # On copie notre nouveau fichier de requirements
 COPY requirements.docker.txt .

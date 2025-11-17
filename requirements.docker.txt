@@ -2,8 +2,8 @@
 # Pas besoin de piwheels, le dépôt PyPI standard supporte arm64.
 
 # 1. Dépendances de l'IA (Torch & Ultralytics)
-torch
-torchvision
+torch==2.5.0
+torchvision==0.20.0
 ultralytics==8.0.206
 
 # 2. Dépendances du serveur web

@@ -3,8 +3,8 @@
 # IA
 ultralytics==8.0.206
 # Installez les versions de torch pour votre PC (ex: avec/sans CUDA)
-torch
-torchvision
+torch==2.5.0
+torchvision==0.20.0
 
 # Serveur web et communication
 Flask==3.1.0

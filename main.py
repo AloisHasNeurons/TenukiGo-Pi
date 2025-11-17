@@ -10,9 +10,7 @@ import base64
 import time
 import os
 # from GoPhoto import *
-import torch.serialization
-import ultralytics.nn.tasks
-import torch.nn
+
 
 import recup_os
 
@@ -33,12 +31,6 @@ cam_index = find_camera_index()
 
 app = Flask(__name__, static_url_path='/static')
 app.secret_key = 'your_secret_key'  
-
-# Ajoutez les deux classes à la liste
-torch.serialization.add_safe_globals([
-    ultralytics.nn.tasks.DetectionModel,
-    torch.nn.Sequential 
-])
 
 model = YOLO('model.pt')
 
@@ -345,8 +337,8 @@ def get_sgf_txt():
         """
     global transparent_mode
     global sgf_text
-    if transparent_mode:
-        sgf_text = go_game.post_treatment(True)
+    #if transparent_mode:
+    #    sgf_text = go_game.post_treatment(True)
     return sgf_text
 
 @app.route('/upload', methods=['POST'])

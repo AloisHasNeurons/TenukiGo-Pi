@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.docker.txt .
 
 # On crée un fichier de requirements filtré SANS 'sente'
-RUN grep -v '^sente==' requirements.docker.txt > requirements.filtered.txt
+RUN grep -v '^sente' requirements.docker.txt > requirements.filtered.txt
 
 # On installe pybind11 (dépendance de build/runtime requise par 'sente' mais absente de votre liste)
 # Puis on installe toutes les autres dépendances du fichier filtré

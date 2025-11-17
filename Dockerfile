@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
+    git \
+    cmake \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
     
 # Étape 3: Installer les dépendances Python

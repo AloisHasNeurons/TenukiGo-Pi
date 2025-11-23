@@ -9,7 +9,6 @@ dependencies:
   # --- Core Mamba Dependencies ---
   - numpy
   - opencv
-  - tensorflow
   - scikit-learn
 
   # PyTorch is a dependency for ultralytics/YOLO
@@ -20,3 +19,4 @@ dependencies:
     - ultralytics
     - sente
     - flake8
+    - tensorflow

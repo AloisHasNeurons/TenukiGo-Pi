@@ -68,30 +68,35 @@ def processing_thread():
     """
     global ProcessFrame, game_plot, message, initialized, sgf_text, go_game # Ajoutez go_game ici
 
-    if not ProcessFrame is None:
-        try:
-            # Stocker l'ancien SGF pour comparaison
-            old_sgf = sgf_text 
+    while True:
+        if not ProcessFrame is None:
+            try:
+                # Stocker l'ancien SGF pour comparaison
+                old_sgf = sgf_text 
 
-            if not initialized:
-                game_plot, sgf_text = go_game.initialize_game(ProcessFrame, endGame)
-                initialized = True
-                message = usual_message
-            else:    
-                game_plot, sgf_text = go_game.main_loop(ProcessFrame, endGame)
-                message = usual_message
+                if not initialized:
+                    game_plot, sgf_text = go_game.initialize_game(ProcessFrame, endGame)
+                    initialized = True
+                    message = usual_message
+                else:    
+                    game_plot, sgf_text = go_game.main_loop(ProcessFrame, endGame)
+                    message = usual_message
 
-            # --- DÉBUT DE L'INTÉGRATION ---
-            # Si le SGF a été mis à jour (un nouveau coup a été joué)
-            if sgf_text != old_sgf and sgf_text is not None:
-                print("Nouveau coup détecté, envoi au serveur...")
-                # Nous devons utiliser un thread pour ne pas bloquer le flux vidéo
-                # (car la fonction d'envoi est 'async')
-                threading.Thread(target=run_websocket_in_thread, args=(sgf_text,)).start()
-            # --- FIN DE L'INTÉGRATION ---
+                # --- DÉBUT DE L'INTÉGRATION ---
+                # Si le SGF a été mis à jour (un nouveau coup a été joué)
+                if sgf_text != old_sgf and sgf_text is not None:
+                    print("Nouveau coup détecté, envoi au serveur...")
+                    # Nous devons utiliser un thread pour ne pas bloquer le flux vidéo
+                    # (car la fonction d'envoi est 'async')
+                    threading.Thread(target=run_websocket_in_thread, args=(sgf_text,)).start()
+                # --- FIN DE L'INTÉGRATION ---
 
-        except Exception as e:
-            message = "Erreur : "+str(e)
+            except Exception as e:
+                message = "Erreur : "+str(e)
+        
+        # PAUSE CRUCIALE : On ne travaille qu'une fois toutes les 2 secondes
+        # Cela libère le processeur pour le flux vidéo et le serveur web
+        time.sleep(2.0)
                 
 def generate_plot():
     """
@@ -102,11 +107,12 @@ def generate_plot():
         """
     global game_plot
     
-    processing_thread()
     if transparent_mode:
         to_plot = game_plot
-    else:
+    elif go_game:
         to_plot = go_game.go_visual.current_position()
+    else:
+        to_plot = empty_board
     
     _, img_encoded = cv2.imencode('.jpg', to_plot)
     img_base64 = base64.b64encode(img_encoded).decode('utf-8')
@@ -505,7 +511,15 @@ def sgf():
 
 
 if __name__ == '__main__':
+    # Démarrer la caméra
+    open_camera()
+    # Initialiser le jeu une première fois
     New_game()
+    
+    # Lancer l'ouvrier de détection en arrière-plan
+    # 'daemon=True' signifie qu'il se fermera quand on coupera le programme
+    detection_thread = threading.Thread(target=processing_thread, daemon=True)
+    detection_thread.start()
     # process_thread = threading.Thread(target=processing_thread, args=())
     # process_thread.start()
     # Écoute sur 0.0.0.0 pour être accessible depuis l'extérieur du conteneur

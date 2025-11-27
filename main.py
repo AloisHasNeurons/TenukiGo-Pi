@@ -4,11 +4,21 @@ from ultralytics import YOLO
 from GoGame import *
 from GoBoard import *
 from GoVisual import *
-from flask import Flask, render_template, Response, request, flash,redirect, send_file, url_for
+from flask import (
+    Flask,
+    render_template,
+    Response,
+    request,
+    flash,
+    redirect,
+    send_file,
+    url_for,
+)
 import cv2
 import base64
 import time
 import os
+
 # from GoPhoto import *
 
 
@@ -16,7 +26,8 @@ import recup_os
 
 from sgf_sender import run_websocket_in_thread
 
-#cam_index = 0
+
+# cam_index = 0
 def find_camera_index():
     index = 0
     while True:
@@ -27,16 +38,17 @@ def find_camera_index():
         cap.release()
         index += 1
 
+
 cam_index = find_camera_index()
 
-app = Flask(__name__, static_url_path='/static')
-app.secret_key = 'your_secret_key'  
+app = Flask(__name__, static_url_path="/static")
+app.secret_key = "your_secret_key"
 
-model = YOLO('model.pt')
+model = YOLO("model.pt")
 
 usual_message = "La caméra est bien fixée et tout est Ok"
 message = "Rien n'a encore été lancé "
-disabled_button = 'stop-button'
+disabled_button = "stop-button"
 
 
 ProcessFrame = None
@@ -52,7 +64,7 @@ endGame = False
 
 
 def New_game(transparent_mode=False):
-    
+
     global go_game, initialized, game_plot
     game = sente.Game()
     go_visual = GoVisual(game)
@@ -61,24 +73,25 @@ def New_game(transparent_mode=False):
     game_plot = empty_board
     initialized = False
 
+
 def processing_thread():
     """
     Process the detection algorithm
     ...
     """
-    global ProcessFrame, game_plot, message, initialized, sgf_text, go_game # Ajoutez go_game ici
+    global ProcessFrame, game_plot, message, initialized, sgf_text, go_game  # Ajoutez go_game ici
 
     while True:
         if not ProcessFrame is None:
             try:
                 # Stocker l'ancien SGF pour comparaison
-                old_sgf = sgf_text 
+                old_sgf = sgf_text
 
                 if not initialized:
                     game_plot, sgf_text = go_game.initialize_game(ProcessFrame, endGame)
                     initialized = True
                     message = usual_message
-                else:    
+                else:
                     game_plot, sgf_text = go_game.main_loop(ProcessFrame, endGame)
                     message = usual_message
 
@@ -88,36 +101,40 @@ def processing_thread():
                     print("Nouveau coup détecté, envoi au serveur...")
                     # Nous devons utiliser un thread pour ne pas bloquer le flux vidéo
                     # (car la fonction d'envoi est 'async')
-                    threading.Thread(target=run_websocket_in_thread, args=(sgf_text,)).start()
+                    threading.Thread(
+                        target=run_websocket_in_thread, args=(sgf_text,)
+                    ).start()
                 # --- FIN DE L'INTÉGRATION ---
 
             except Exception as e:
-                message = "Erreur : "+str(e)
-        
+                message = "Erreur : " + str(e)
+
         # PAUSE CRUCIALE : On ne travaille qu'une fois toutes les 2 secondes
         # Cela libère le processeur pour le flux vidéo et le serveur web
         time.sleep(2.0)
-                
+
+
 def generate_plot():
     """
-        Generate a plot representing the game
-        
-        Returns:
-            Image
-        """
+    Generate a plot representing the game
+
+    Returns:
+        Image
+    """
     global game_plot
-    
+
     if transparent_mode:
         to_plot = game_plot
     elif go_game:
         to_plot = go_game.go_visual.current_position()
     else:
         to_plot = empty_board
-    
-    _, img_encoded = cv2.imencode('.jpg', to_plot)
-    img_base64 = base64.b64encode(img_encoded).decode('utf-8')
+
+    _, img_encoded = cv2.imencode(".jpg", to_plot)
+    img_base64 = base64.b64encode(img_encoded).decode("utf-8")
 
     return img_base64
+
 
 # def end_camera():
 #     global process_thread, camera_running, disabled_button
@@ -136,308 +153,328 @@ def generate_plot():
 #         camera_running = True
 #         disabled_button = 'start-button'  # Define the ID of the button to desactivate
 
-@app.route('/')
+
+@app.route("/")
 def index():
     """Route to display HTML page"""
-    
-    return render_template('home.html', disabled_button=disabled_button)
 
-@app.route('/update')
+    return render_template("home.html", disabled_button=disabled_button)
+
+
+@app.route("/update")
 def afficher_message():
     """
-        Route to update the image and the message to display 
-        
-        Returns:
-            message
-            image
+    Route to update the image and the message to display
+
+    Returns:
+        message
+        image
     """
 
-    return {'message': message, 'image' : generate_plot()}
+    return {"message": message, "image": generate_plot()}
+
 
 def generate_frames():
     """
-        Generate an image from the video stream
-        
-        Returns:
-            Image
+    Generate an image from the video stream
+
+    Returns:
+        Image
     """
     global ProcessFrame, camera
-    while True:  
+    while True:
         try:
             success, frame = camera.read()  # Read the image from the camera
             if not success:
                 break
-            
+
             else:
                 ProcessFrame = copy.deepcopy(frame)
-                _, buffer = cv2.imencode('.jpg', frame)
+                _, buffer = cv2.imencode(".jpg", frame)
                 frame = buffer.tobytes()
-                yield (b'--frame\r\n'
-                        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                yield (
+                    b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
+                )
                 time.sleep(0.05)
         except Exception:
-            print('Exception: Camera not detected')
+            print("Exception: Camera not detected")
             break
-    
-@app.route('/video_feed')
+
+
+@app.route("/video_feed")
 def video_feed():
     """
-    Route to send the video stream 
+    Route to send the video stream
     """
     print("in video feed")
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(
+        generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame"
+    )
+
 
 def end_camera():
-    """stop the camera """
+    """stop the camera"""
     global camera
     camera.release()
 
+
 def open_camera():
-    """open the camera """
+    """open the camera"""
     global camera
     os = recup_os.get_os()
-    if os == "Windows" :
+    if os == "Windows":
         camera = cv2.VideoCapture(cam_index, cv2.CAP_DSHOW)
-    elif os == "Linux" :
+    elif os == "Linux":
         camera = cv2.VideoCapture(cam_index, cv2.V4L2)
-    else : 
+    else:
         camera = cv2.VideoCapture(cam_index)
 
-    try :
+    try:
         camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-    except :
+    except:
         pass
-    
 
-@app.route('/cam', methods=['POST', 'GET'])
+
+@app.route("/cam", methods=["POST", "GET"])
 def getval():
     """
-        Route to send the video stream 
+    Route to send the video stream
     """
     global disabled_button, transparent_mode
-    
+
     transparent_mode = False
- 
+
     try:
-        k = request.form['psw1']
-        if k == '0':
+        k = request.form["psw1"]
+        if k == "0":
             open_camera()
             if camera.read()[0]:
                 New_game()
-                disabled_button = 'start-button'
-        elif k == '1':
+                disabled_button = "start-button"
+        elif k == "1":
             end_camera()
-            disabled_button = 'stop-button'
+            disabled_button = "stop-button"
     except Exception:
         print("Exception: Page can not be refreshed")
-    
-    
-    return render_template('partie.html', disabled_button=disabled_button)
 
-@app.route('/t', methods=['POST', 'GET'])
+    return render_template("partie.html", disabled_button=disabled_button)
+
+
+@app.route("/t", methods=["POST", "GET"])
 def getvaltransparent():
     """
-    Route to send the video stream 
+    Route to send the video stream
     """
     global disabled_button, transparent_mode
-    
+
     transparent_mode = True
     try:
-        k = request.form['psw1']
-        if k == '0':
+        k = request.form["psw1"]
+        if k == "0":
             open_camera()
             if camera.read()[0]:
                 New_game(True)
-                disabled_button = 'start-button'
-        elif k == '1':
+                disabled_button = "start-button"
+        elif k == "1":
             end_camera()
-            disabled_button = 'stop-button'
+            disabled_button = "stop-button"
     except Exception:
         print("Exception: Page can not be refreshed")
-        
-    return render_template('transparent.html', disabled_button=disabled_button)
 
-@app.route('/game', methods=['POST'])
+    return render_template("transparent.html", disabled_button=disabled_button)
+
+
+@app.route("/game", methods=["POST"])
 def getval2():
     """
-        Change the current move
+    Change the current move
     """
     global transparent_mode
-    
-    transparent_mode = False
-    
-    i = request.form['psw2']
-    if i =='2':
-        go_game.go_visual.initial_position()
-    elif i == '3':
-        go_game.go_visual.previous()
-    elif i == '4':
-        go_game.go_visual.next()
-    elif i == '5':
-        go_game.go_visual.final_position() 
-    print(i)   
-    return render_template('partie.html', disabled_button=disabled_button)
 
-@app.route('/sgf_controls', methods=['POST'])
+    transparent_mode = False
+
+    i = request.form["psw2"]
+    if i == "2":
+        go_game.go_visual.initial_position()
+    elif i == "3":
+        go_game.go_visual.previous()
+    elif i == "4":
+        go_game.go_visual.next()
+    elif i == "5":
+        go_game.go_visual.final_position()
+    print(i)
+    return render_template("partie.html", disabled_button=disabled_button)
+
+
+@app.route("/sgf_controls", methods=["POST"])
 def getval3():
     """
-        Change the current move
+    Change the current move
     """
     global transparent_mode
-    
-    transparent_mode = False
-    
-    i = request.form['psw2']
-    if i =='2':
-        go_game.go_visual.initial_position()
-    elif i == '3':
-        go_game.go_visual.previous()
-    elif i == '4':
-        go_game.go_visual.next()
-    elif i == '5':
-        go_game.go_visual.final_position() 
-    print(i)   
-    return render_template('sgf.html', disabled_button=disabled_button)
 
-@app.route('/rules', methods=['POST'])
+    transparent_mode = False
+
+    i = request.form["psw2"]
+    if i == "2":
+        go_game.go_visual.initial_position()
+    elif i == "3":
+        go_game.go_visual.previous()
+    elif i == "4":
+        go_game.go_visual.next()
+    elif i == "5":
+        go_game.go_visual.final_position()
+    print(i)
+    return render_template("sgf.html", disabled_button=disabled_button)
+
+
+@app.route("/rules", methods=["POST"])
 def handle_rules():
     """
-        Check if we want to apply rules, still not implemented
+    Check if we want to apply rules, still not implemented
     """
     global rules_applied, transparent_mode
-    
+
     transparent_mode = False
-    
-    rules_applied = request.form['psw3']
+
+    rules_applied = request.form["psw3"]
     if rules_applied == "True":
         go_game.set_transparent_mode(False)
         rules_applied = "False"
-    else : 
+    else:
         go_game.set_transparent_mode(True)
         print("########pas de regles")
         rules_applied = "True"
-    return render_template('partie.html', disabled_button=disabled_button)
+    return render_template("partie.html", disabled_button=disabled_button)
 
-@app.route('/change_place', methods=['POST'])
+
+@app.route("/change_place", methods=["POST"])
 def change_place():
     """
-        Route to get the piece that we want to change its position
-        """
+    Route to get the piece that we want to change its position
+    """
     global transparent_mode
-    
-    transparent_mode = False
-    
-    old_pos = request.form['input1']
-    new_pos = request.form['input2']
-    try:
-        go_game.correct_stone(old_pos,new_pos)
-    except Exception as e:
-        message = "L'erreur est "+str(e)
-    return render_template('partie.html', disabled_button=disabled_button)
 
-@app.route('/get_sgf_txt')
+    transparent_mode = False
+
+    old_pos = request.form["input1"]
+    new_pos = request.form["input2"]
+    try:
+        go_game.correct_stone(old_pos, new_pos)
+    except Exception as e:
+        message = "L'erreur est " + str(e)
+    return render_template("partie.html", disabled_button=disabled_button)
+
+
+@app.route("/get_sgf_txt")
 def get_sgf_txt():
     """
-        Route which returns the sgf text to be uploaded
-        """
+    Route which returns the sgf text to be uploaded
+    """
     global transparent_mode
     global sgf_text
-    #if transparent_mode:
+    # if transparent_mode:
     #    sgf_text = go_game.post_treatment(True)
     return sgf_text
 
-@app.route('/upload', methods=['POST'])
+
+@app.route("/upload", methods=["POST"])
 def process():
     """
-        Route which enables us to save the sgf text
-        """
+    Route which enables us to save the sgf text
+    """
     global transparent_mode
-    
+
     transparent_mode = False
-    file = request.files['file']
+    file = request.files["file"]
     file_path = file.filename
     try:
         go_game.go_visual.load_game_from_sgf(file_path)
         message = "Le fichier a été correctement chargé"
     except Exception as e:
-        message = "L'erreur est "+str(e)
-    
+        message = "L'erreur est " + str(e)
 
-    return render_template('sgf.html', disabled_button=disabled_button)
+    return render_template("sgf.html", disabled_button=disabled_button)
 
-@app.route('/Home')
+
+@app.route("/Home")
 def home():
     """
-        Route to get to the home page
-        """    
+    Route to get to the home page
+    """
     open_camera()
-    return render_template('Home.html', disabled_button=disabled_button)
+    return render_template("Home.html", disabled_button=disabled_button)
 
-@app.route('/credit')
+
+@app.route("/credit")
 def credit():
     """
-        Route to get to the credit page
-        """
+    Route to get to the credit page
+    """
     return render_template("credits.html")
 
-@app.route('/undo', methods=['POST'])
+
+@app.route("/undo", methods=["POST"])
 def undo():
     """
     undo last played move
     """
     global transparent_mode
-    
+
     transparent_mode = False
-    
+
     go_game.delete_last_move()
     return render_template("partie.html")
-    
-@app.route('/historique')
+
+
+@app.route("/historique")
 def historique():
     """
-        Route to get to the summary page
+    Route to get to the summary page
     """
     return render_template("Historique.html")
 
 
-@app.route('/partie')
+@app.route("/partie")
 def partie():
     """
     Route to get to the streaming page in game mode
     """
     global transparent_mode
-    
+
     transparent_mode = False
 
     return render_template("partie.html", disabled_button=disabled_button)
 
-@app.route('/transparent')
+
+@app.route("/transparent")
 def transparent():
     """
-        Route to get to the streaming page in transparent mode
-        """
+    Route to get to the streaming page in transparent mode
+    """
     go_game.set_transparent_mode(True)
     global transparent_mode
-    
+
     transparent_mode = False
     return render_template("transparent.html")
-   
-#@app.route('/modePhoto')
-#def modePhoto():
+
+
+# @app.route('/modePhoto')
+# def modePhoto():
 #    """
 #        Route to get to the streaming page in photo mode
 #        """
 #    return render_template("photo.html")
 #
-#app.config['UPLOAD_FOLDER'] = 'uploads'  # Dossier pour enregistrer les fichiers
-#app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Taille maximale des fichiers (16 Mo)
+# app.config['UPLOAD_FOLDER'] = 'uploads'  # Dossier pour enregistrer les fichiers
+# app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Taille maximale des fichiers (16 Mo)
 #
 ## Vérifiez que le dossier d'upload existe, sinon, créez-le
-#os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-#UPLOAD_FOLDER = 'uploads'
+# os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+# UPLOAD_FOLDER = 'uploads'
 #
-#def delete_uploaded_files():
+# def delete_uploaded_files():
 #    """Supprime tous les fichiers du dossier UPLOAD_FOLDER."""
 #    try:
 #        # Lister tous les fichiers dans le dossier
@@ -451,8 +488,8 @@ def transparent():
 #    except Exception as e:
 #        print(f"Erreur lors de la suppression des fichiers : {e}")
 
-#@app.route('/uploadImg', methods=['POST'])
-#def upload_files():    
+# @app.route('/uploadImg', methods=['POST'])
+# def upload_files():
 #
 #    if 'images' not in request.files:
 #        flash('Aucun fichier sélectionné')
@@ -478,9 +515,9 @@ def transparent():
 #
 #    return redirect(url_for('modePhoto'))
 #
-#global sgf_text_photo
+# global sgf_text_photo
 #
-#def process_uploaded_files(file_paths):
+# def process_uploaded_files(file_paths):
 #    """
 #    Fonction pour traiter les fichiers téléversés.
 #    - file_paths : Liste des chemins des fichiers enregistrés.
@@ -490,32 +527,32 @@ def transparent():
 #    delete_uploaded_files()
 
 
-#@app.route('/get_sgf_photo')
-#def get_sgf_photo():
+# @app.route('/get_sgf_photo')
+# def get_sgf_photo():
 #    """
 #        Route which returns the sgf text to be uploaded
 #        """
 #    global sgf_text_photo
 #    return sgf_text_photo
 
-@app.route('/sgf')
+
+@app.route("/sgf")
 def sgf():
     """
-        Route to get to the streaming page in transparent mode
-        """
+    Route to get to the streaming page in transparent mode
+    """
     global transparent_mode
-    
+
     transparent_mode = False
     return render_template("sgf.html")
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Démarrer la caméra
     open_camera()
     # Initialiser le jeu une première fois
     New_game()
-    
+
     # Lancer l'ouvrier de détection en arrière-plan
     # 'daemon=True' signifie qu'il se fermera quand on coupera le programme
     detection_thread = threading.Thread(target=processing_thread, daemon=True)
@@ -524,5 +561,4 @@ if __name__ == '__main__':
     # process_thread.start()
     # Écoute sur 0.0.0.0 pour être accessible depuis l'extérieur du conteneur
     # Le debug est désactivé pour la production
-    app.run(debug=False, host='0.0.0.0', port=5000)
- 
+    app.run(debug=False, host="0.0.0.0", port=5000)

@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Tuple
 import keras
 import numpy as np
 import sente
+import cv2
 
 from .GoBoard import GoBoard
 from .GoVisual import GoVisual
@@ -24,7 +25,8 @@ class GoGame:
                  board_detect: GoBoard,
                  go_visual: GoVisual,
                  corrector_model: keras.Model,
-                 transparent_mode: bool = False):
+                 transparent_mode: bool = False,
+                 frame_diff_threshold: float = 2.0):
         """
         Initialize the GoGame manager.
 
@@ -34,6 +36,7 @@ class GoGame:
             go_visual: GoVisual visualization instance
             corrector_model: AI model for move correction
             transparent_mode: Whether to use transparent mode
+            frame_diff_threshold: Threshold for frame difference to trigger processing
         """
         self.moves: List[Tuple[str, Tuple[int, int]]] = []
         self.board_detect = board_detect
@@ -46,6 +49,12 @@ class GoGame:
         self.buffer_size = 5
         self.numpy_board: List[np.ndarray] = []
         self.frame: Optional[np.ndarray] = None
+        
+        # Optimization: Frame difference heuristic
+        self.frame_diff_threshold = frame_diff_threshold
+        self.last_processed_frame_small: Optional[np.ndarray] = None
+        self.last_visual_output: Optional[np.ndarray] = None
+        self.last_sgf: str = ""
 
     def set_transparent_mode(self, mode: bool):
         """Set the transparent mode on or off."""
@@ -70,24 +79,38 @@ class GoGame:
         self.frame = frame
 
         self.board_detect.process_frame(frame)
+        
+        # Initialize optimization state
+        small_frame = cv2.resize(frame, (128, 128))
+        self.last_processed_frame_small = cv2.cvtColor(small_frame, cv2.COLOR_BGR2GRAY)
 
         if self.transparent_mode:
             detected_state = self.transparent_mode_moves()
-            return (self.go_visual.draw_transparent(detected_state),
-                    self.post_treatment(end_game))
+            visual = self.go_visual.draw_transparent(detected_state)
+            sgf = self.post_treatment(end_game)
+            self.last_visual_output = visual
+            self.last_sgf = sgf
+            return visual, sgf
         else:
             try:
                 self.setup_initial_position()
                 if not self.game.get_active_player().name == current_player:
                     self.game.pss()
-                return self.go_visual.current_position(), self.get_sgf()
+                visual = self.go_visual.current_position()
+                sgf = self.get_sgf()
+                self.last_visual_output = visual
+                self.last_sgf = sgf
+                return visual, sgf
             except Exception as e:
                 logger.warning(f"Could not setup position: {e}. "
                                "Falling back to transparent draw.")
                 detected_state = np.transpose(
                     self.board_detect.get_state(), (1, 0, 2)
                 )
-                return self.go_visual.draw_transparent(detected_state), ""
+                visual = self.go_visual.draw_transparent(detected_state)
+                self.last_visual_output = visual
+                self.last_sgf = ""
+                return visual, ""
 
     def setup_initial_position(self):
         """Set up the initial board position for an in-progress game."""
@@ -151,15 +174,35 @@ class GoGame:
             tuple: (visual_output, sgf_text)
         """
         self.frame = frame
+        
+        # Optimization: Check if frame has changed significantly
+        small_frame = cv2.resize(frame, (128, 128))
+        current_frame_small = cv2.cvtColor(small_frame, cv2.COLOR_BGR2GRAY)
+        
+        if self.last_processed_frame_small is not None:
+            mse = np.mean((current_frame_small - self.last_processed_frame_small) ** 2)
+            if mse < self.frame_diff_threshold:
+                # Frame hasn't changed enough, return cached result
+                return self.last_visual_output, self.last_sgf
+        
+        # Frame changed, process it
+        self.last_processed_frame_small = current_frame_small
         self.board_detect.process_frame(frame)
 
         if self.transparent_mode:
             detected_state = self.transparent_mode_moves()
-            return (self.go_visual.draw_transparent(detected_state),
-                    self.post_treatment(end_game))
+            visual = self.go_visual.draw_transparent(detected_state)
+            sgf = self.post_treatment(end_game)
+            self.last_visual_output = visual
+            self.last_sgf = sgf
+            return visual, sgf
         else:
             self.define_new_move()
-            return self.go_visual.current_position(), self.get_sgf()
+            visual = self.go_visual.current_position()
+            sgf = self.get_sgf()
+            self.last_visual_output = visual
+            self.last_sgf = sgf
+            return visual, sgf
 
     def copy_board_to_numpy(self):
         """Convert board state to numpy array and store if different."""

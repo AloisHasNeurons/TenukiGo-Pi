@@ -62,6 +62,10 @@ def parse_arguments() -> argparse.Namespace:
         "--real-time", dest='transparent', action='store_false',
         help="Use real-time mode (detects moves frame-by-frame)."
     )
+    parser.add_argument(
+        "--threshold", type=float, default=2.0,
+        help="Threshold for frame difference optimization (default: 2.0)."
+    )
     return parser.parse_args()
 
 
@@ -168,7 +172,8 @@ def run_pipeline(args: argparse.Namespace):
         board_detect=go_board,
         go_visual=go_visual,
         corrector_model=corrector_model,
-        transparent_mode=use_transparent
+        transparent_mode=use_transparent,
+        frame_diff_threshold=args.threshold
     )
 
     mode = "TRANSPARENT (AI Post-Processing)" if use_transparent else (

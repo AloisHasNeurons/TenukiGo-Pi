@@ -71,7 +71,10 @@ def to_sgf(move_list: List[Tuple[int, int, int]]) -> str:
     for move in move_list:
         row, col, player = move
         # Sente uses 1-19 indexing for play()
-        game.play(row + 1, col + 1)
+        try:
+            game.play(row + 1, col + 1)
+        except Exception as e:
+            logger.warning(f"Skipping illegal move {move}: {e}")
     return sgf.dumps(game)
 
 

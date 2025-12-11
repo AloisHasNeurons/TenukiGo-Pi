@@ -1,0 +1,16 @@
+---
+- name: Mise à jour du cache APT et mise à niveau du système
+  apt:
+    update_cache: yes
+    upgrade: dist
+    cache_valid_time: 3600
+
+- name: Installation des paquets utilitaires de base
+  apt:
+    name:
+      - bc
+      - iptables
+      - python3
+      - git
+      - curl
+    state: present

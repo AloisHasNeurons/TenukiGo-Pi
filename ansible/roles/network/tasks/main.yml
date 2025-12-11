@@ -1,0 +1,54 @@
+---
+- name: Installation de hostapd et dnsmasq
+  apt:
+    name:
+      - hostapd
+      - dnsmasq
+    state: present
+
+- name: Configuration de hostapd (/etc/hostapd/hostapd.conf)
+  copy:
+    dest: /etc/hostapd/hostapd.conf
+    content: |
+      interface=wlan0
+      driver=nl80211
+      ssid=Go-Camera
+      hw_mode=g
+      channel=7
+      wmm_enabled=0
+      macaddr_acl=0
+      auth_algs=1
+      ignore_broadcast_ssid=0
+      wpa=2
+      wpa_passphrase=gocamera123
+      wpa_key_mgmt=WPA-PSK
+      rsn_pairwise=CCMP
+
+- name: Pointer hostapd vers le fichier de configuration
+  lineinfile:
+    path: /etc/default/hostapd
+    regexp: '^#?DAEMON_CONF='
+    line: 'DAEMON_CONF="/etc/hostapd/hostapd.conf"'
+
+- name: Backup de dnsmasq.conf original
+  command: mv /etc/dnsmasq.conf /etc/dnsmasq.conf.bak
+  args:
+    creates: /etc/dnsmasq.conf.bak
+
+- name: Configuration de dnsmasq (/etc/dnsmasq.conf)
+  copy:
+    dest: /etc/dnsmasq.conf
+    content: |
+      interface=wlan0
+      dhcp-range=10.0.0.2,10.0.0.20,255.255.255.0,24h
+      domain=wlan
+      address=/gw.wlan/10.0.0.1
+
+- name: Désactiver les services au démarrage (car gérés par tes scripts)
+  service:
+    name: "{{ item }}"
+    enabled: no
+    state: stopped
+  loop:
+    - hostapd
+    - dnsmasq

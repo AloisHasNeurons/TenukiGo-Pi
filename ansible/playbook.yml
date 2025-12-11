@@ -1,0 +1,10 @@
+---
+- name: Configuration de la Go-Camera
+  hosts: gocamera
+  become: true 
+
+  roles:
+    - common
+    - network
+    - camera
+    - docker

@@ -1,0 +1,19 @@
+---
+- name: Installation des applications caméra (rpicam-apps)
+  apt:
+    name: rpicam-apps
+    state: present
+
+- name: Configuration GPU Memory (256MB)
+  lineinfile:
+    path: /boot/config.txt
+    regexp: '^gpu_mem='
+    line: 'gpu_mem=256'
+  notify: Reboot Raspberry Pi
+
+- name: Activation Legacy Camera (au cas où)
+  lineinfile:
+    path: /boot/config.txt
+    regexp: '^start_x='
+    line: 'start_x=1'
+  when: ansible_distribution_release != 'bookworm'

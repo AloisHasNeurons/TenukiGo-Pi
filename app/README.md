@@ -1,79 +1,82 @@
-# TenukiGo-Pi
-## Setup Instructions
+# TenukiGo Application
 
-This project uses **Micromamba (or conda/mamba)** for environment management. This is the recommended way to ensure complex dependencies like OpenCV and PyTorch are installed correctly.
+Ceci est le code source de l'application TenukiGo. Il est conçu pour tourner :
+1.  **Sur Raspberry Pi** (via Docker + TFLite Runtime).
+2.  **Sur PC/Dev** (via Python + TensorFlow/Keras).
 
----
+## 📂 Structure
 
-### Local Setup (Micromamba / Conda)
-
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/AloisHasNeurons/TenukiGo-Pi.git
-    cd TenukiGo-Pi
-    ```
-
-2.  **Create the Micromamba/Conda environment:**
-    This command reads the `environment.yml` file and installs all necessary packages.
-    ```bash
-    # Using Micromamba (fastest)
-    micromamba env create -f environment.yml
-
-    # Or using full Conda
-    conda env create -f environment.yml
-    ```
-
-3.  **Activate the environment:**
-    ```bash
-    micromamba activate tenukigo_pi
-    # Or
-    conda activate tenukigo_pi
-    ```
-    *(Your terminal prompt should now show `(tenukigo_pi)` at the beginning)*
-
-4.  **Install the package in editable mode:**
-    This links your `src/` directory so Python can find your code. Run this command from the project root directory (`TenukiGo-Pi/`).
-    ```bash
-    pip install -e .
-    ```
-
-You are now ready to run the script.
+*   `Dockerfile` : Définition de l'image de production (Raspberry Pi 3B+ / Arm64).
+*   `main.py` : Point d'entrée principal. Analyse une vidéo et génère un SGF.
+*   `src/` : Code source du package `tenukigo_pi`.
+*   `models/` : Modèles IA (YOLOv8 `.pt` et CNN `.tflite` / `.keras`).
+*   `scripts/` : Scripts Bash utilisés par l'image Docker (capture `rpicam-vid`).
+*   `lib/` : Roue `sente` compilée (dépendance C++ critique).
 
 ---
 
-## How to Run
+## 💻 Développement Local (PC/Mac)
 
-After completing the setup steps:
+Vous pouvez lancer l'analyse sur votre machine sans Docker pour débugger la logique de jeu ou de vision.
 
-1.  **Ensure your environment is active.** Your terminal prompt should show `(tenukigo_pi)`. If not, activate it.
+### 1. Installation de l'environnement
+Le projet utilise **Micromamba** (ou Conda) pour gérer les dépendances complexes (TensorFlow, PyTorch, OpenCV).
 
-2.  **Make sure you are in the project root directory** (`TenukiGo-Pi/`).
-
-3.  **(Optional) Place your video file** in the `data/` directory. This keeps the project root clean.
-
-4.  **Run the main script**, providing the path to your Go game video file.
-
-    **Example using the test video:**
-    ```bash
-    python main.py --video data/test.mp4
-    ```
-
-    **Example using your own video:**
-    ```bash
-    python main.py --video data/my_game.mp4
-    ```
-
-5.  **Wait for processing.** The script will load the models and process the video. You'll see log messages in the terminal.
-
-6.  **Check the output.** Once the script finishes, a file named `game_output.sgf` will be created in the `outputs/` directory. This file contains the recorded game in SGF format.
-
-### Optional Arguments
-
-* `--yolo-model <path>`: Specify a different path for the YOLO model (`.pt`).
-* `--keras-model <path>`: Specify a different path for the Keras model (`.keras`).
-* `--output <path>`: Specify a different name or location for the output SGF file.
-
-**Example with options:**
 ```bash
-python main.py --video data/my_game.mp4 --output outputs/final_game.sgf
+# 1. Aller dans le dossier de l'application
+cd app
+
+# 2. Créer l'environnement à partir du fichier environment.yml
+micromamba env create -f environment.yml
+
+# 3. Activer l'environnement
+micromamba activate tenukigo_pi
+
+# 4. Installer le package local en mode éditable
+# Cela permet de modifier le code dans src/ sans réinstaller
+pip install -e .
 ```
+> **Note sur sente** : Si l'installation automatique de la librairie sente échoue (problème de compilation C++ fréquent), vous devrez peut-être installer le wheel pré-compilé manuellement ou suivre les instructions de compilation dans Dockerfile.build_sente.
+
+
+### 2. Lancer l'analyse
+```bash
+# Analyse d'une vidéo MP4
+python main.py \
+  --video data/ma_partie.mp4 \
+  --output result.sgf \
+  --yolo-model models/model.pt \
+  --keras-model models/modelCNN.keras
+```
+
+> **Note** : Sur PC, le script utilisera automatiquement TensorFlow/Keras (défini dans environment.yml). Sur Raspberry Pi, il basculera sur TFLite Runtime.
+
+---
+
+## 🐳 Docker (Production RPi)
+
+L'image Docker est optimisée pour la Raspberry Pi (Arm64).
+
+### Build Manuel
+```bash
+# Depuis le dossier app/
+podman build --platform linux/arm64 -t tenukigo-app:latest .
+```
+
+### Test Manuel (Sur RPi)
+```bash
+docker run -it --rm \
+  --device /dev/video0 \
+  -v $(pwd)/data:/app/go_videos \
+  tenukigo-app:latest \
+  /bin/bash
+```
+
+---
+
+## 📜 Scripts
+
+*   `scripts/cam_go_script.sh` : Script "Chef d'orchestre" lancé par les boutons physiques.
+    1.  Lance `rpicam-vid` (enregistrement).
+    2.  Attend le signal `SIGINT` (Bouton Stop).
+    3.  Lance `main.py` pour analyser la vidéo capturée.

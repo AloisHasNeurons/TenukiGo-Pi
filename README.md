@@ -1,79 +1,103 @@
-# TenukiGo-Pi
-## Setup Instructions
+# TenukiGo-Pi (IoT & IaC Migration)
 
-This project uses **Micromamba (or conda/mamba)** for environment management. This is the recommended way to ensure complex dependencies like OpenCV and PyTorch are installed correctly.
+Système d'enregistrement et d'analyse de parties de Go sur Raspberry Pi 3B+, entièrement conteneurisé et piloté par Infrastructure as Code.
 
----
+![Architecture](https://img.shields.io/badge/Architecture-Ansible%20%2B%20Docker-blue)
+![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%203B%2B-red)
 
-### Local Setup (Micromamba / Conda)
+## 🏗 Architecture
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/AloisHasNeurons/TenukiGo-Pi.git
-    cd TenukiGo-Pi
-    ```
+Le projet est divisé en deux couches distinctes :
 
-2.  **Create the Micromamba/Conda environment:**
-    This command reads the `environment.yml` file and installs all necessary packages.
-    ```bash
-    # Using Micromamba (fastest)
-    micromamba env create -f environment.yml
+1.  **Infrastructure (Hôte - Ansible)** :
+    *   Configuration du système (OS, Optimisations, Docker Engine).
+    *   Gestion du Réseau (Bascule WiFi AP / Client).
+    *   Gestion matérielle (Daemon python pour les Boutons & LEDs).
+    *   Ce daemon pilote le conteneur via `docker exec`.
 
-    # Or using full Conda
-    conda env create -f environment.yml
-    ```
-
-3.  **Activate the environment:**
-    ```bash
-    micromamba activate tenukigo_pi
-    # Or
-    conda activate tenukigo_pi
-    ```
-    *(Your terminal prompt should now show `(tenukigo_pi)` at the beginning)*
-
-4.  **Install the package in editable mode:**
-    This links your `src/` directory so Python can find your code. Run this command from the project root directory (`TenukiGo-Pi/`).
-    ```bash
-    pip install -e .
-    ```
-
-You are now ready to run the script.
+2.  **Application (Conteneur - Docker)** :
+    *   Capture vidéo (`rpicam-vid`).
+    *   Logique métier (Découpage, Analyse Sente, IA TFLite).
+    *   Encapsulé dans une image `tenukigo-app` basée sur `python:3.10-slim`.
 
 ---
 
-## How to Run
+## 🛠 Matériel Requis
 
-After completing the setup steps:
+*   **Raspberry Pi 3B+**.
+*   **Raspberry Pi Camera Module 3** (Wide ou Standard).
+*   **Interface Physique** :
+    *   3 Boutons : **Power**, **Play/Pause**, **Wifi**.
+    *   LEDs d'état (RGB / Simples).
 
-1.  **Ensure your environment is active.** Your terminal prompt should show `(tenukigo_pi)`. If not, activate it.
+---
 
-2.  **Make sure you are in the project root directory** (`TenukiGo-Pi/`).
+## 🚀 Installation & Déploiement
 
-3.  **(Optional) Place your video file** in the `data/` directory. This keeps the project root clean.
+### Pré-requis (Sur votre machine de contrôle)
+*   Ansible installé.
+*   Accès SSH à la Raspberry Pi (IP connue).
 
-4.  **Run the main script**, providing the path to your Go game video file.
+### Étape 1 : Configuration Ansible
+1.  Editez `ansible/inventory.ini` avec l'IP de votre Pi.
+2.  Vérifiez les variables dans `ansible/playbook.yml` (SSID, etc.).
 
-    **Example using the test video:**
-    ```bash
-    python scripts/process_video.py --video data/test.mp4
-    ```
-
-    **Example using your own video:**
-    ```bash
-    python scripts/process_video.py --video data/my_game.mp4
-    ```
-
-5.  **Wait for processing.** The script will load the models and process the video. You'll see log messages in the terminal.
-
-6.  **Check the output.** Once the script finishes, a file named `game_output.sgf` will be created in the `outputs/` directory. This file contains the recorded game in SGF format.
-
-### Optional Arguments
-
-* `--yolo-model <path>`: Specify a different path for the YOLO model (`.pt`).
-* `--keras-model <path>`: Specify a different path for the Keras model (`.keras`).
-* `--output <path>`: Specify a different name or location for the output SGF file.
-
-**Example with options:**
+### Étape 2 : Provisioning de l'Infrastructure
+Lancez le playbook pour configurer tout le système hôte :
 ```bash
-python scripts/process_video.py --video data/my_game.mp4 --output outputs/final_game.sgf
+cd ansible
+ansible-playbook -i inventory.ini playbook.yml
+```
+*Cela installe Docker, configure le WiFi, et lance le service de gestion des boutons.*
+
+### Étape 3 : Déploiement de l'Application (Via GitHub Releases)
+L'image Docker est pré-compilée et disponible sur GitHub. Sur la Raspberry Pi :
+
+```bash
+# 1. Télécharger l'archive de la dernière release
+wget https://github.com/AloisHasNeurons/TenukiGo-Pi/releases/download/v1.0.0-alpha/tenukigo-app.tar
+
+# 2. Charger l'image dans Docker
+docker load -i tenukigo-app.tar
+
+# 3. Démarrer le conteneur
+docker run -d \
+  --name tenukigo-app \
+  --privileged \
+  --restart unless-stopped \
+  -v /home/pi/videos:/app/go_videos \
+  -v /home/pi/sgf:/app/output_sgf \
+  tenukigo-app:latest
+```
+
+*(Note : Si vous souhaitez modifier le code, vous pouvez toujours reconstruire l'image localement via `podman build` ou `docker build`)*
+
+---
+
+## 🎮 Utilisation
+
+### Interface Physique
+*   **Bouton Power** : Gestion de l'alimentation.
+*   **Bouton Play/Pause** : Lance ou met en pause l'enregistrement/analyse.
+*   **Bouton Wifi** : Bascule entre mode **Access Point** (LED Bleue) et **Client** (LED Verte).
+
+### Récupération des Parties
+Les fichiers `.sgf` sont générés dans le dossier monté `/app/output_sgf`. Vous pouvez les récupérer via SCP.
+
+---
+
+## 📂 Structure du Projet
+
+```text
+.
+├── ansible/            # IaC : Configuration du système hôte
+│   └── roles/
+│       ├── buttons/    # Service systemd pour les boutons
+│       └── network/    # Scripts de gestion WiFi
+├── app/                # Code source de l'application
+│   ├── Dockerfile      # Image technique (Python + RPi Libs)
+│   ├── main.py         # Point d'entrée de l'analyse
+│   ├── scripts/        # Scripts bash (capture vidéo)
+│   └── src/            # Logique Python (IA, SGF)
+└── models/             # Modèles TFLite / YOLO
 ```

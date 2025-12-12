@@ -27,6 +27,10 @@ COPY pyproject.toml README.md /app/
 COPY src/ /app/src/
 RUN pip install .
 
+COPY scripts/ /app/scripts/
+
 COPY models/ /app/models/
+
+RUN chmod +x /app/scripts/*.sh
 
 CMD ["tail", "-f", "/dev/null"]

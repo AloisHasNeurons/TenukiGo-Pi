@@ -1,53 +1,66 @@
 """
-AI Model Utilities.
-
-Provides functions for loading the Keras corrector model and
-using it to fill gaps in Go board state sequences.
+AI Model Utilities (Hybrid TFLite/Keras).
+Compatible Raspberry Pi (Edge) et PC (Server).
 """
 
 import logging
 from typing import List, Tuple
-
-import keras
 import numpy as np
-from keras.saving import load_model
 
 logger = logging.getLogger(__name__)
 
+# --- Environment detection ---
+try:
+    # Light version for the Raspberry Pi
+    import tflite_runtime.interpreter as tflite
+    RUNTIME = "TFLITE"
+    logger.info("Using TFLite Runtime (Edge optimized)")
+except ImportError:
+    try:
+        import tensorflow.lite as tflite
+        RUNTIME = "TFLITE"
+        logger.info("Using TensorFlow Lite Interpreter")
+    except ImportError:
+        # Fallback
+        from keras.saving import load_model
+        RUNTIME = "KERAS"
+        logger.info("Using Full Keras Runtime")
 
-def load_corrector_model(model_path: str) -> keras.Model:
-    """
-    Loads the Keras model from the given path.
 
-    Args:
-        model_path (str): The file path to the .keras or .h5 model.
+def load_corrector_model(model_path: str):
+    """Charge le modèle selon l'environnement disponible."""
+    logger.info(f"Loading model from: {model_path}")
 
-    Returns:
-        keras.Model: The loaded model.
-    """
-    logger.info(f"Loading corrector model from: {model_path}")
-    # compile=False is crucial for loading models saved with an optimizer
-    # when you only need to do inference.
-    model = load_model(model_path, compile=False)
-    return model
+    if RUNTIME == "TFLITE":
+        interpreter = tflite.Interpreter(model_path=model_path)
+        interpreter.allocate_tensors()
+        return interpreter
+    else:
+        return load_model(model_path, compile=False)
 
 
-def delete_states(sequence: List[np.ndarray],
-                  start: int,
-                  end: int) -> List[np.ndarray]:
-    """
-    Replace states with zeros to create gaps.
+def run_inference(model, input_data):
+    """Fonction d'inférence agnostique (cache la complexité TFLite)."""
+    if RUNTIME == "TFLITE":
+        input_details = model.get_input_details()
+        output_details = model.get_output_details()
 
-    Args:
-        sequence (list): Original sequence of Go board states.
-        start (int): Starting index of the gap.
-        end (int): Ending index of the gap (exclusive).
+        input_index = input_details[0]['index']
+        output_index = output_details[0]['index']
 
-    Returns:
-        list: Sequence with states replaced by zeros.
-    """
-    if not sequence:
-        return []
+        if input_data.shape != model.get_input_details()[0]['shape']:
+            model.resize_tensor_input(input_index, input_data.shape)
+            model.allocate_tensors()
+
+        model.set_tensor(input_index, input_data)
+        model.invoke()
+        return model.get_tensor(output_index)
+    else:
+        return model.predict(input_data, verbose=0)
+
+
+def delete_states(sequence: List[np.ndarray], start: int, end: int) -> List[np.ndarray]:
+    if not sequence: return []
     board_shape = sequence[0].shape
     for i in range(start, end):
         if i < len(sequence):
@@ -55,148 +68,78 @@ def delete_states(sequence: List[np.ndarray],
     return sequence
 
 
-def get_possible_moves(
-    initial_state: np.ndarray,
-    final_state: np.ndarray
-) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
-    """
-    Get possible moves in a gap by diffing the start and end states.
-
-    Args:
-        initial_state (np.array): The board state *before* the gap.
-        final_state (np.array): The board state *after* the gap.
-    Returns:
-        tuple: A tuple containing:
-            - list: List of (row, col) tuples for Black moves.
-            - list: List of (row, col) tuples for White moves.
-    """
+def get_possible_moves(initial_state: np.ndarray, final_state: np.ndarray) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
     difference = final_state - initial_state
-
-    # Find all black moves (difference == 1)
-    black_moves_np = np.argwhere(difference == 1)
-    black_moves = [tuple(move) for move in black_moves_np]
-
-    # Find all white moves (difference == 2)
-    white_moves_np = np.argwhere(difference == 2)
-    white_moves = [tuple(move) for move in white_moves_np]
-
+    black_moves = [tuple(m) for m in np.argwhere(difference == 1)]
+    white_moves = [tuple(m) for m in np.argwhere(difference == 2)]
     return black_moves, white_moves
 
 
-def fill_gaps(model: keras.Model,
+def fill_gaps(model,  # TFlite or Keras
               sequence_with_gap: List[np.ndarray],
               gap_start: int,
               gap_end: int,
               black_possible_moves: List[Tuple[int, int]],
               white_possible_moves: List[Tuple[int, int]]) -> List[np.ndarray]:
-    """
-    Fill the gaps in a sequence using the AI model to pick the best move.
-    """
+
     filled_sequence = sequence_with_gap.copy()
 
-    # Safety check
     if not (0 <= gap_start < gap_end <= len(filled_sequence)):
-        logger.error(f"Invalid gap range: {gap_start} to {gap_end}")
         return filled_sequence
 
-    # Determine current player based on the last move *before* the gap.
     if gap_start >= 2:
-        state_before_gap_1 = filled_sequence[gap_start - 1]
-        state_before_gap_2 = filled_sequence[gap_start - 2]
-        difference = state_before_gap_1 - state_before_gap_2
-
-        # If diff=1, Black just played, so current_player is White (2).
-        # Otherwise, it's Black's turn (1).
-        current_player = 2 if np.any(difference == 1) else 1
+        diff = filled_sequence[gap_start - 1] - filled_sequence[gap_start - 2]
+        current_player = 2 if np.any(diff == 1) else 1
     else:
-        # Default to Black if we don't have enough history
         current_player = 1
 
     black_moves = black_possible_moves.copy()
     white_moves = white_possible_moves.copy()
 
-    logger.info(f"Filling gap from {gap_start} to {gap_end}, "
-                f"starting with player {current_player}")
-
     for gap_index in range(gap_start, gap_end):
         current_board_state = filled_sequence[gap_index - 1]
         possible_moves = black_moves if current_player == 1 else white_moves
 
-        # Find moves that are valid (i.e., on an empty intersection)
-        valid_moves = [
-            move for move in possible_moves
-            if current_board_state[move[0], move[1]] == 0
-        ]
+        valid_moves = [m for m in possible_moves if current_board_state[m[0], m[1]] == 0]
 
         if not valid_moves:
-            logger.warning(
-                f"No valid moves for player {current_player} at "
-                f"gap index {gap_index}. Using fallback (copying state)."
-            )
-            # Fallback: copy previous state and try to continue
             filled_sequence[gap_index] = current_board_state.copy()
-            # Switch player and continue
             current_player = 3 - current_player
             continue
 
         candidate_boards = []
         candidate_moves = []
-
         for move in valid_moves:
-            x, y = move
-            candidate_board = current_board_state.copy()
-            candidate_board[x, y] = current_player
-            candidate_boards.append(candidate_board)
+            board = current_board_state.copy()
+            board[move[0], move[1]] = current_player
+            candidate_boards.append(board)
             candidate_moves.append(move)
 
-        # Prepare batch for the model
-        batch_boards = np.array(candidate_boards)
+        batch_boards = np.array(candidate_boards, dtype=np.float32)
         batch_boards = np.expand_dims(batch_boards, axis=-1)
-        batch_boards = batch_boards.astype(np.float32)
 
-        # Predict probabilities for all candidate boards at once
         try:
-            probabilities = model.predict(batch_boards, verbose=0)
+            probabilities = run_inference(model, batch_boards)
 
-            # Get the index of the best move
             best_move_idx = np.argmax(probabilities[:, current_player - 1])
             best_move = candidate_moves[best_move_idx]
 
-            # Update the board state in the sequence
             x, y = best_move
             filled_sequence[gap_index] = current_board_state.copy()
             filled_sequence[gap_index][x, y] = current_player
 
-            # Remove the chosen move from the list of possibilities
             if current_player == 1:
-                if best_move in black_moves:
-                    black_moves.remove(best_move)
+                if best_move in black_moves: black_moves.remove(best_move)
             else:
-                if best_move in white_moves:
-                    white_moves.remove(best_move)
-
-            logger.debug(
-                f"Filled gap {gap_index}: "
-                f"Player {current_player} at {best_move}"
-            )
+                if best_move in white_moves: white_moves.remove(best_move)
 
         except Exception as e:
-            logger.error(f"Prediction error at gap {gap_index}: {e}. "
-                         "Using first valid move as fallback.")
-            # Fallback: use the first valid move
-            best_move = valid_moves[0]
-            x, y = best_move
-            filled_sequence[gap_index] = current_board_state.copy()
-            filled_sequence[gap_index][x, y] = current_player
-            # Ensure move is removed from list even in fallback
-            if current_player == 1:
-                if best_move in black_moves:
-                    black_moves.remove(best_move)
-            else:
-                if best_move in white_moves:
-                    white_moves.remove(best_move)
+            logger.error(f"Prediction error at gap {gap_index}: {e}")
+            if valid_moves:
+                best_move = valid_moves[0]
+                filled_sequence[gap_index] = current_board_state.copy()
+                filled_sequence[gap_index][best_move[0], best_move[1]] = current_player
 
-        # Switch player for the next move
-        current_player = 3 - current_player  # 1 -> 2, 2 -> 1
+        current_player = 3 - current_player
 
     return filled_sequence

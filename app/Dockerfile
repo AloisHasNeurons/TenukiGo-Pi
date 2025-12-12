@@ -23,6 +23,7 @@ COPY lib/ /app/lib/
 RUN pip install /app/lib/sente-*.whl
 
 COPY pyproject.toml README.md /app/
+COPY main.py /app/
 
 COPY src/ /app/src/
 RUN pip install .

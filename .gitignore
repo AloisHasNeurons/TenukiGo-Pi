@@ -33,3 +33,5 @@ outputs/
 *.mp4
 *.h264
 debug_*
+
+*.tar

@@ -27,9 +27,6 @@ COPY main.py /app/
 COPY src/ /app/src/
 RUN pip install --no-cache-dir .
 
-COPY scripts/ /app/scripts/
-RUN chmod +x /app/scripts/*.sh
-
 COPY models/ /app/models/
 
 

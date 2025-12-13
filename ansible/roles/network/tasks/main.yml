@@ -1,12 +1,12 @@
 ---
-- name: Installation de hostapd et dnsmasq
+- name: Install hostapd and dnsmasq
   apt:
     name:
       - hostapd
       - dnsmasq
     state: present
 
-- name: Configuration de hostapd (/etc/hostapd/hostapd.conf)
+- name: Configure hostapd (/etc/hostapd/hostapd.conf)
   template:
     src: hostapd.conf.j2
     dest: /etc/hostapd/hostapd.conf
@@ -15,18 +15,18 @@
     mode: '0600'
   notify: Restart hostapd
 
-- name: Pointer hostapd vers le fichier de configuration
+- name: Point hostapd to configuration file
   lineinfile:
     path: /etc/default/hostapd
     regexp: '^#?DAEMON_CONF='
     line: 'DAEMON_CONF="/etc/hostapd/hostapd.conf"'
 
-- name: Backup de dnsmasq.conf original
+- name: Backup original dnsmasq.conf
   command: mv /etc/dnsmasq.conf /etc/dnsmasq.conf.bak
   args:
     creates: /etc/dnsmasq.conf.bak
 
-- name: Configuration de dnsmasq (/etc/dnsmasq.conf)
+- name: Configure dnsmasq (/etc/dnsmasq.conf)
   template:
     src: dnsmasq.conf.j2
     dest: /etc/dnsmasq.conf
@@ -35,7 +35,7 @@
     mode: '0644'
   notify: Restart dnsmasq
 
-- name: Désactiver les services au démarrage (car gérés par les scripts)
+- name: Disable services at boot (managed by scripts)
   service:
     name: "{{ item }}"
     enabled: no
@@ -44,7 +44,7 @@
     - hostapd
     - dnsmasq
 
-- name: Créer le dossier des scripts
+- name: Create scripts directory
   file:
     path: "{{ scripts_dir }}"
     state: directory
@@ -52,7 +52,7 @@
     group: "{{ ansible_user }}"
     mode: '0755'
 
-- name: Copier le serveur Wifi Python
+- name: Copy Python Wifi Server
   copy:
     src: server_wifi.py
     dest: "{{ scripts_dir }}/server_wifi.py"
@@ -60,7 +60,7 @@
     group: "{{ ansible_user }}"
     mode: '0755'
 
-- name: Copier le script de diffusion youtube
+- name: Copy YouTube broadcast script
   copy:
     src: youtube_live.sh
     dest: "{{ scripts_dir }}/youtube_live.sh"
@@ -68,7 +68,7 @@
     group: "{{ ansible_user }}"
     mode: '0755'
 
-- name: Copier le script de gestion réseau CLIENT (v2)
+- name: Copy CLIENT mode network script (v2)
   copy:
     src: net_mode_client_v2.sh
     dest: "{{ scripts_dir }}/net_mode_client.sh"
@@ -76,7 +76,7 @@
     group: "{{ ansible_user }}"
     mode: '0755'
 
-- name: Copier le script de gestion réseau AP (v2)
+- name: Copy AP mode network script (v2)
   copy:
     src: net_mode_ap_v2.sh
     dest: "{{ scripts_dir }}/net_mode_ap.sh"

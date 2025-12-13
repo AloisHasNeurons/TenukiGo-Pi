@@ -1,35 +1,35 @@
 ---
-- name: Installation des applications caméra (rpicam-apps)
+- name: Install camera applications (rpicam-apps)
   apt:
     name: rpicam-apps
     state: present
 
-- name: Configuration GPU Memory (256MB)
+- name: Configure GPU Memory (256MB)
   lineinfile:
     path: /boot/config.txt
     regexp: '^gpu_mem='
     line: 'gpu_mem=256'
   notify: Reboot Raspberry Pi
 
-- name: Activation Legacy Camera (au cas où)
-  lineinfile:
+- name: Enable Legacy Camera (fallback)
+  lineinfile::
     path: /boot/config.txt
     regexp: '^start_x='
     line: 'start_x=1'
   when: ansible_distribution_release != 'bookworm'
 
-- name: Créer le dossier des vidéos avec les bonnes permissions
+- name: Create videos directory with permissions
   file:
-    path: "/home/{{ ansible_user }}/go_videos"
+    path: "{{ videos_dir }}"
     state: directory
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
 
-- name: Copier le script de la caméra
+- name: Copy camera capture script
   copy:
     src: cam_go_script.sh
-    dest: "/home/{{ ansible_user }}/scripts/cam_go_script.sh"
+    dest: "{{ scripts_dir }}/cam_go_script.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'

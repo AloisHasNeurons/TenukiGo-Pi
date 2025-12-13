@@ -1,5 +1,5 @@
 ---
-- name: Configuration de la Go-Camera
+- name: TenukiGo-Pi Configuration
   hosts: gocamera
   become: true 
 

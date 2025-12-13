@@ -1,27 +1,27 @@
 ---
-- name: Téléchargement du script d'installation officiel Docker
+- name: Download official Docker installation script
   get_url:
     url: https://get.docker.com
     dest: /tmp/install-docker.sh
     mode: '0755'
 
-- name: Exécution du script d'installation
+- name: Execute installation script
   command: /tmp/install-docker.sh
   args:
     creates: /usr/bin/docker
 
-- name: Ajout de l'utilisateur courant au groupe docker
+- name: Add current user to docker group
   user:
     name: "{{ ansible_user }}"
     groups: docker
     append: yes
 
-- name: Installation des dépendances Python pour Ansible Docker
+- name: Install Python dependencies for Ansible Docker
   apt:
     name: python3-docker
     state: present
 
-- name: Copier l'archive Docker sur la Raspberry Pi
+- name: Copy Docker archive to Raspberry Pi
   copy:
     src: ../app/tenukigo-app.tar.gz 
     dest: "/home/{{ ansible_user }}/tenukigo-app.tar.gz"
@@ -30,7 +30,7 @@
     mode: '0644'
   register: docker_archive_copy
 
-- name: Charger l'image Docker depuis l'archive locale
+- name: Load Docker image from local archive
   docker_image:
     name: localhost/tenukigo-app
     tag: latest
@@ -39,7 +39,7 @@
     timeout: 600
   when: docker_archive_copy.changed
 
-- name: Lancer le conteneur TenukiGo
+- name: Start TenukiGo container
   docker_container:
     name: tenukigo-app
     image: localhost/tenukigo-app:latest
@@ -49,5 +49,5 @@
     privileged: true
     recreate: "{{ docker_archive_copy.changed }}"
     volumes:
-      - "/home/{{ ansible_user }}/go_videos:/app/go_videos"
-      - "/home/{{ ansible_user }}/output_sgf:/app/output_sgf"
+      - "{{ videos_dir }}:/app/go_videos"
+      - "{{ sgf_dir }}:/app/output_sgf"

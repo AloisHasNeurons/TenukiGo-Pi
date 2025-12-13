@@ -1,0 +1,6 @@
+---
+# Project Global Configuration
+project_root: "/home/{{ ansible_user }}"
+scripts_dir: "{{ project_root }}/scripts"
+videos_dir: "{{ project_root }}/go_videos"
+sgf_dir: "{{ project_root }}/output_sgf"

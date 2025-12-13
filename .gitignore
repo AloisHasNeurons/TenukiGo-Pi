@@ -35,3 +35,4 @@ outputs/
 debug_*
 
 *.tar
+*.tar.gz

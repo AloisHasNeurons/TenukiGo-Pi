@@ -36,3 +36,5 @@ debug_*
 
 *.tar
 *.tar.gz
+
+app/backup_raspberry

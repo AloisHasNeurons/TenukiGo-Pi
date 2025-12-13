@@ -1,0 +1,17 @@
+---
+# Network Configuration
+wifi_ssid: "Go-Camera"
+wifi_password: "gocamera123"
+wifi_channel: 7
+wifi_country: "FR"
+wifi_interface: "wlan0"
+
+# AP Configuration
+ap_ip_address: "10.0.0.1"
+ap_dhcp_range_start: "10.0.0.2"
+ap_dhcp_range_end: "10.0.0.20"
+ap_dhcp_lease_time: "24h"
+
+# System Paths
+scripts_dir: "/home/{{ ansible_user }}/scripts"
+video_dir: "/home/{{ ansible_user }}/go_videos"

@@ -7,22 +7,13 @@
     state: present
 
 - name: Configuration de hostapd (/etc/hostapd/hostapd.conf)
-  copy:
+  template:
+    src: hostapd.conf.j2
     dest: /etc/hostapd/hostapd.conf
-    content: |
-      interface=wlan0
-      driver=nl80211
-      ssid=Go-Camera
-      hw_mode=g
-      channel=7
-      wmm_enabled=0
-      macaddr_acl=0
-      auth_algs=1
-      ignore_broadcast_ssid=0
-      wpa=2
-      wpa_passphrase=gocamera123
-      wpa_key_mgmt=WPA-PSK
-      rsn_pairwise=CCMP
+    owner: root
+    group: root
+    mode: '0600'
+  notify: Restart hostapd
 
 - name: Pointer hostapd vers le fichier de configuration
   lineinfile:
@@ -36,15 +27,15 @@
     creates: /etc/dnsmasq.conf.bak
 
 - name: Configuration de dnsmasq (/etc/dnsmasq.conf)
-  copy:
+  template:
+    src: dnsmasq.conf.j2
     dest: /etc/dnsmasq.conf
-    content: |
-      interface=wlan0
-      dhcp-range=10.0.0.2,10.0.0.20,255.255.255.0,24h
-      domain=wlan
-      address=/gw.wlan/10.0.0.1
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart dnsmasq
 
-- name: Désactiver les services au démarrage (car gérés par tes scripts)
+- name: Désactiver les services au démarrage (car gérés par les scripts)
   service:
     name: "{{ item }}"
     enabled: no
@@ -55,7 +46,7 @@
 
 - name: Créer le dossier des scripts
   file:
-    path: "/home/{{ ansible_user }}/scripts"  # Force le chemin /home/mao/scripts
+    path: "{{ scripts_dir }}"
     state: directory
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
@@ -64,7 +55,7 @@
 - name: Copier le serveur Wifi Python
   copy:
     src: server_wifi.py
-    dest: "/home/{{ ansible_user }}/scripts/server_wifi.py"
+    dest: "{{ scripts_dir }}/server_wifi.py"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
@@ -72,19 +63,23 @@
 - name: Copier le script de diffusion youtube
   copy:
     src: youtube_live.sh
-    dest: "/home/{{ ansible_user }}/scripts/youtube_live.sh"
+    dest: "{{ scripts_dir }}/youtube_live.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
 
-- name: Copier les scripts de gestion réseau
+- name: Copier le script de gestion réseau CLIENT (v2)
   copy:
-    src: "{{ item }}"
-    dest: "/home/{{ ansible_user }}/scripts/{{ item }}"
+    src: net_mode_client_v2.sh
+    dest: "{{ scripts_dir }}/net_mode_client.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
-  loop:
-    - net_mode_ap.sh
-    - net_mode_client.sh
-    - net_mode.sh
+
+- name: Copier le script de gestion réseau AP (v2)
+  copy:
+    src: net_mode_ap_v2.sh
+    dest: "{{ scripts_dir }}/net_mode_ap.sh"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'

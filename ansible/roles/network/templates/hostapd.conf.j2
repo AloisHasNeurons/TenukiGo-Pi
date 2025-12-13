@@ -1,0 +1,13 @@
+interface={{ wifi_interface }}
+driver=nl80211
+ssid={{ wifi_ssid }}
+hw_mode=g
+channel={{ wifi_channel }}
+wmm_enabled=0
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase={{ wifi_password }}
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP

@@ -1,0 +1,10 @@
+---
+- name: Restart hostapd
+  service:
+    name: hostapd
+    state: restarted
+
+- name: Restart dnsmasq
+  service:
+    name: dnsmasq
+    state: restarted

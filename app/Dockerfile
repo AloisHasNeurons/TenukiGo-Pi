@@ -20,18 +20,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY lib/ /app/lib/
-RUN pip install /app/lib/sente-*.whl
+RUN pip install --no-cache-dir /app/lib/sente-*.whl
 
 COPY pyproject.toml README.md /app/
 COPY main.py /app/
-
 COPY src/ /app/src/
-RUN pip install .
+RUN pip install --no-cache-dir .
 
 COPY scripts/ /app/scripts/
+RUN chmod +x /app/scripts/*.sh
 
 COPY models/ /app/models/
 
-RUN chmod +x /app/scripts/*.sh
 
 CMD ["tail", "-f", "/dev/null"]

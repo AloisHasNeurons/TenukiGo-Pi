@@ -1,36 +1,25 @@
-"""
-AI Model Utilities (Hybrid TFLite/Keras).
-Compatible Raspberry Pi (Edge) et PC (Server).
-"""
-
 import logging
-from typing import List, Tuple
 import numpy as np
+from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
-# --- Environment detection ---
+# --- Détection Hybride TFLite (Pi) / Keras (PC) ---
+RUNTIME = "KERAS" # Valeur par défaut pour l'IDE
 try:
-    # Light version for the Raspberry Pi
     import tflite_runtime.interpreter as tflite
     RUNTIME = "TFLITE"
-    logger.info("Using TFLite Runtime (Edge optimized)")
 except ImportError:
     try:
         import tensorflow.lite as tflite
         RUNTIME = "TFLITE"
-        logger.info("Using TensorFlow Lite Interpreter")
     except ImportError:
-        # Fallback
         from keras.saving import load_model
         RUNTIME = "KERAS"
-        logger.info("Using Full Keras Runtime")
 
 
 def load_corrector_model(model_path: str):
-    """Charge le modèle selon l'environnement disponible."""
-    logger.info(f"Loading model from: {model_path}")
-
+    logger.info(f"Loading model ({RUNTIME}) from: {model_path}")
     if RUNTIME == "TFLITE":
         interpreter = tflite.Interpreter(model_path=model_path)
         interpreter.allocate_tensors()
@@ -38,20 +27,17 @@ def load_corrector_model(model_path: str):
     else:
         return load_model(model_path, compile=False)
 
-
 def run_inference(model, input_data):
-    """Fonction d'inférence agnostique (cache la complexité TFLite)."""
     if RUNTIME == "TFLITE":
         input_details = model.get_input_details()
         output_details = model.get_output_details()
-
         input_index = input_details[0]['index']
         output_index = output_details[0]['index']
-
+        
         if input_data.shape != model.get_input_details()[0]['shape']:
             model.resize_tensor_input(input_index, input_data.shape)
             model.allocate_tensors()
-
+            
         model.set_tensor(input_index, input_data)
         model.invoke()
         return model.get_tensor(output_index)

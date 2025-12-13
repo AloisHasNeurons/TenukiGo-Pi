@@ -52,3 +52,39 @@
   loop:
     - hostapd
     - dnsmasq
+
+- name: Créer le dossier des scripts
+  file:
+    path: "/home/{{ ansible_user }}/scripts"  # Force le chemin /home/mao/scripts
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Copier le serveur Wifi Python
+  copy:
+    src: server_wifi.py
+    dest: "/home/{{ ansible_user }}/scripts/server_wifi.py"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Copier le script de diffusion youtube
+  copy:
+    src: youtube_live.sh
+    dest: "/home/{{ ansible_user }}/scripts/youtube_live.sh"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Copier les scripts de gestion réseau
+  copy:
+    src: "{{ item }}"
+    dest: "/home/{{ ansible_user }}/scripts/{{ item }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  loop:
+    - net_mode_ap.sh
+    - net_mode_client.sh
+    - net_mode.sh

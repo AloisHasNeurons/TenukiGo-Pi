@@ -17,3 +17,19 @@
     regexp: '^start_x='
     line: 'start_x=1'
   when: ansible_distribution_release != 'bookworm'
+
+- name: Créer le dossier des vidéos avec les bonnes permissions
+  file:
+    path: "/home/{{ ansible_user }}/go_videos"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Copier le script de la caméra
+  copy:
+    src: cam_go_script.sh
+    dest: "/home/{{ ansible_user }}/scripts/cam_go_script.sh"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'

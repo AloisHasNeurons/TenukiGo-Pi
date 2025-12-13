@@ -13,4 +13,5 @@
       - python3
       - git
       - curl
+      - ffmpeg
     state: present

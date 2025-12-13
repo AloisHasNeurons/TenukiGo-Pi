@@ -10,9 +10,44 @@
   args:
     creates: /usr/bin/docker
 
-- name: Ajout de l'utilisateur 'pi' au groupe docker
+- name: Ajout de l'utilisateur courant au groupe docker
   user:
-    name: pi
+    name: "{{ ansible_user }}"
     groups: docker
     append: yes
-  # Permet de lancer docker sans 'sudo'
+
+- name: Installation des dépendances Python pour Ansible Docker
+  apt:
+    name: python3-docker
+    state: present
+
+- name: Copier l'archive Docker sur la Raspberry Pi
+  copy:
+    src: ../app/tenukigo-app.tar.gz 
+    dest: "/home/{{ ansible_user }}/tenukigo-app.tar.gz"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  register: docker_archive_copy
+
+- name: Charger l'image Docker depuis l'archive locale
+  docker_image:
+    name: localhost/tenukigo-app
+    tag: latest
+    source: load
+    load_path: "/home/{{ ansible_user }}/tenukigo-app.tar.gz"
+    timeout: 600
+  when: docker_archive_copy.changed
+
+- name: Lancer le conteneur TenukiGo
+  docker_container:
+    name: tenukigo-app
+    image: localhost/tenukigo-app:latest
+    pull: missing
+    state: started
+    restart_policy: always
+    privileged: true
+    recreate: "{{ docker_archive_copy.changed }}"
+    volumes:
+      - "/home/{{ ansible_user }}/go_videos:/app/go_videos"
+      - "/home/{{ ansible_user }}/output_sgf:/app/output_sgf"

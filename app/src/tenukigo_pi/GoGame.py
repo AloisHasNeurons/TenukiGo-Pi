@@ -5,7 +5,6 @@ Main game logic and state management for Go game recognition.
 import logging
 from typing import Dict, List, Optional, Tuple
 
-import keras
 import numpy as np
 import sente
 
@@ -23,7 +22,7 @@ class GoGame:
     def __init__(self, game: sente.Game,
                  board_detect: GoBoard,
                  go_visual: GoVisual,
-                 corrector_model: keras.Model,
+                 corrector_model,
                  transparent_mode: bool = False):
         """
         Initialize the GoGame manager.

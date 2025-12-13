@@ -14,7 +14,6 @@ within that "gap".
 import logging
 from typing import List, Tuple
 
-import keras
 import numpy as np
 
 from .corrector_noAI import differences
@@ -25,7 +24,7 @@ MoveTuple = Tuple[int, int, int]
 
 
 def corrector_with_ai(board_states: List[np.ndarray],
-                      corrector_model: keras.Model) -> List[MoveTuple]:
+                      corrector_model) -> List[MoveTuple]:
     """
     Reconstructs a move list from board states, using an AI model
     to fill gaps when simple heuristics fail.

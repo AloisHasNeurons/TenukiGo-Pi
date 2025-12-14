@@ -28,8 +28,8 @@
 
 - name: Copy camera capture script
   template:
-    src: cam_go_script.sh.j2
-    dest: "{{ scripts_dir }}/cam_go_script.sh"
+    src: record_game.sh.j2
+    dest: "{{ scripts_dir }}/record_game.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'

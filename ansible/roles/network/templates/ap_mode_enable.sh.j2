@@ -55,9 +55,9 @@ start_ap_services() {
 start_config_server() {
   echo "Starting Config Server..."
   pkill -f "python3 -m http.server" 2>/dev/null || true
-  pkill -f "server_wifi.py" 2>/dev/null || true
+  pkill -f "wifi_config_server.py" 2>/dev/null || true
 
-  nohup python3 "${SCRIPTS_DIR}/server_wifi.py" > "${LOG_FILE}" 2>&1 &
+  nohup python3 "${SCRIPTS_DIR}/wifi_config_server.py" > "${LOG_FILE}" 2>&1 &
 }
 
 main() {

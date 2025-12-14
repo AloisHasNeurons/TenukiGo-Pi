@@ -13,14 +13,12 @@ import urllib.parse
 import subprocess
 import os
 import uuid
-import sys
 from typing import List
 
 # Server Configuration
 PORT = 80
 AP_GATEWAY_IP = "10.0.0.1"
 
-# Paths configured by Ansible
 # Paths configured by Ansible
 VIDEO_DIR = "{{ videos_dir }}"
 STREAM_CONFIG_FILE = os.path.join(VIDEO_DIR, "../stream_config.txt")

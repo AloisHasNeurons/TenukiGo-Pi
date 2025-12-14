@@ -65,26 +65,21 @@
     group: "{{ ansible_user }}"
     mode: '0755'
 
-- name: Copy Python Wifi Server
+- name: Deploy Python WiFi Config Server
   template:
-    src: server_wifi.py.j2
-    dest: "{{ scripts_dir }}/server_wifi.py"
+    src: wifi_config_server.py.j2
+    dest: "{{ scripts_dir }}/wifi_config_server.py"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
 
-- name: Deploy streaming script (start_streaming.sh)
+- name: Deploy streaming script (stream_video.sh)
   template:
-    src: start_streaming.sh.j2
-    dest: "{{ scripts_dir }}/start_streaming.sh"
+    src: stream_video.sh.j2
+    dest: "{{ scripts_dir }}/stream_video.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
-
-- name: Remove legacy streaming script (youtube_live.sh)
-  file:
-    path: "{{ scripts_dir }}/youtube_live.sh"
-    state: absent
 
 - name: Ensure default stream config exists
   lineinfile:
@@ -94,19 +89,33 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
 
-
-- name: Copy CLIENT mode network script
+- name: Copy Client Mode Enable script
   template:
-    src: client_mode.sh.j2
-    dest: "{{ scripts_dir }}/client_mode.sh"
+    src: client_mode_enable.sh.j2
+    dest: "{{ scripts_dir }}/enable_client_mode.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
 
-- name: Copy AP mode network script
+- name: Copy AP Mode Enable script
   template:
-    src: ap_mode.sh.j2
-    dest: "{{ scripts_dir }}/ap_mode.sh"
+    src: ap_mode_enable.sh.j2
+    dest: "{{ scripts_dir }}/enable_ap_mode.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
+
+- name: Clean up legacy network scripts
+  file:
+    path: "{{ scripts_dir }}/{{ item }}"
+    state: absent
+  loop:
+    - net_mode_ap.sh
+    - net_mode_ap_v2.sh
+    - net_mode_client.sh
+    - net_mode_client_v2.sh
+    - youtube_live.sh
+    - start_streaming.sh
+    - ap_mode.sh
+    - client_mode.sh
+    - server_wifi.py

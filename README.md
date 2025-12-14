@@ -24,7 +24,7 @@ The project follows a strict separation of concerns:
 
 ---
 
-## 🛠 Hardware Requirements
+## Hardware Requirements
 
 *   **Raspberry Pi 3B+** (or newer).
 *   **Raspberry Pi Camera Module 2** (or newer).

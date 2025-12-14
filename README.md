@@ -1,4 +1,4 @@
-# TenukiGo-Pi (IoT & IaC)
+# TenukiGo-Pi
 
 TenukiGo-Pi is a fully containerized IoT system for recording and analyzing Go (Weiqi/Baduk) games on a Raspberry Pi. It leverages Computer Vision (YOLO + CNN) to digitize real-world games into SGF format automatically.
 
@@ -71,7 +71,7 @@ We provide a unified deployment script to handle discovery and provisioning.
     *   *Press again*: Stop recording and trigger SGF generation.
 *   **Blue Button (Wi-Fi)**: 
     *   *Press*: Toggle between **Client Mode** (Green LED) and **Access Point Mode** (Blue LED).
-    *   *AP Mode*: Connect to Wi-Fi `TenukiGo-Pi` (Password: `123456`). A captive portal will open to configure your home Wi-Fi credentials.
+    *   *AP Mode*: Connect to Wi-Fi `TenukiGo-Pi` (Password: `gocamera-123456`). A captive portal will open to configure your home Wi-Fi credentials.
 *   **Red Button**: Power off the device safely.
 
 ### Retrieving Games

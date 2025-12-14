@@ -60,7 +60,7 @@ podman build --platform linux/arm64 -t tenukigo-app:latest .
 This image is then loaded onto the Raspberry Pi via the Ansible deployment pipeline.
 
 ### Integration with Infrastructure
-In production, this container is orchestrated by `scripts/cam_go_script.sh` (deployed on the host). The workflow is:
+In production, this container is orchestrated by `scripts/record_game.sh` (deployed on the host). The workflow is:
 1.  Host script captures video using `rpicam-vid`.
 2.  Host script mounts the video directory into the container.
 3.  Host script triggers `docker exec ... python3 /app/main.py`.

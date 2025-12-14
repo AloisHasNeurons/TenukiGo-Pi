@@ -1,0 +1,6 @@
+---
+- name: Restart GPIO Service
+  systemd:
+    name: gpio-controller
+    state: restarted
+    daemon_reload: yes

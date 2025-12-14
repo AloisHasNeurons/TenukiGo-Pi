@@ -92,7 +92,7 @@
 - name: Copy Client Mode Enable script
   template:
     src: client_mode_enable.sh.j2
-    dest: "{{ scripts_dir }}/enable_client_mode.sh"
+    dest: "{{ scripts_dir }}/client_mode_enable.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
@@ -100,22 +100,7 @@
 - name: Copy AP Mode Enable script
   template:
     src: ap_mode_enable.sh.j2
-    dest: "{{ scripts_dir }}/enable_ap_mode.sh"
+    dest: "{{ scripts_dir }}/ap_mode_enable.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
-
-- name: Clean up legacy network scripts
-  file:
-    path: "{{ scripts_dir }}/{{ item }}"
-    state: absent
-  loop:
-    - net_mode_ap.sh
-    - net_mode_ap_v2.sh
-    - net_mode_client.sh
-    - net_mode_client_v2.sh
-    - youtube_live.sh
-    - start_streaming.sh
-    - ap_mode.sh
-    - client_mode.sh
-    - server_wifi.py

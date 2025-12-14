@@ -28,12 +28,6 @@ stop_client_services() {
 
 configure_interface() {
   echo "Configuring Interface..."
-  
-  modprobe -r brcmfmac
-  sleep 1
-  modprobe brcmfmac roamoff=1
-  sleep 2
-
   rfkill unblock wlan
   ip link set wlan0 down
   ip addr flush dev wlan0

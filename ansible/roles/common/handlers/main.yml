@@ -1,4 +1,7 @@
 ---
 - name: Reboot System
   reboot:
-    reboot_timeout: 300
+
+- name: Reload Systemd
+  systemd:
+    daemon_reload: yes

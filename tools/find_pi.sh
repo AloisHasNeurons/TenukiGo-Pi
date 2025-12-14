@@ -54,10 +54,9 @@ main() {
     exit 1
   fi
 
-  # Update the IP address in the inventory file.
-  # Matches any line starting with an IP address (ignoring leading whitespace)
-  # and replaces the IP portion.
-  sed -i -E "s/^\s*[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/${ip_address}/" "$INVENTORY_FILE"
+  # Update the IP address and user in the inventory file.
+  # Matches lines starting with an IP and replaces both the IP and the ansible_user (if present).
+  sed -i -E "s/^(\s*)[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(\s+ansible_user=)\S+/\1${ip_address}\2${hostname}/" "$INVENTORY_FILE"
 
   echo "Successfully updated inventory for ${hostname} (${ip_address})."
 }

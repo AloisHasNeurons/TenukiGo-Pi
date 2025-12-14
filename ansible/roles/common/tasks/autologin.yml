@@ -1,0 +1,16 @@
+---
+- name: Create autologin directory
+  file:
+    path: /etc/systemd/system/getty@tty1.service.d
+    state: directory
+    mode: '0755'
+
+- name: Configure Console Auto-Login
+  copy:
+    dest: /etc/systemd/system/getty@tty1.service.d/override.conf
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=-/sbin/agetty --autologin {{ ansible_user }} --noclear %I $TERM
+    mode: '0644'
+  notify: Reload Systemd

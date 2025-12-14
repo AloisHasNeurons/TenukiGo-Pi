@@ -37,7 +37,7 @@ The project follows a strict separation of concerns:
 ## Installation & Deployment
 
 ### Prerequisites (Control Machine)
-*   User with SSH access to the Raspberry Pi.
+*   User with SSH access to the Raspberry Pi (i.e. on the same network).
 *   `ansible` installed locally.
 *   `podman` or `docker` (optional, for rebuilding the application image).
 
@@ -76,8 +76,9 @@ We provide a unified deployment script to handle discovery and provisioning.
 
 ### Retrieving Games
 Generated `.sgf` files are stored in `~/output_sgf` on the Pi.
-You can retrieve them via SCP or view them via the built-in HTTP server in AP mode.
+You can retrieve them via SCP or view them via the built-in HTTP server in AP mode (see figure below).
 
+![Python Server Example](figs/python_server_example.png)
 ---
 
 ## Project Structure

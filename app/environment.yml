@@ -1,20 +1,11 @@
 name: tenukigo_pi
 channels:
   - conda-forge
-  - defaults
 dependencies:
   - python=3.10
   - pip
-
-  # --- Core Mamba Dependencies ---
   - numpy
   - scikit-learn
-
-  # PyTorch is a dependency for ultralytics/YOLO
-  - pytorch
-
-  # --- Pip-managed Dependencies ---
   - pip:
     - ultralytics
-    - tensorflow
     - opencv-python-headless

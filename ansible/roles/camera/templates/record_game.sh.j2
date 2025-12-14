@@ -46,7 +46,9 @@ finalize() {
   # 2. Trigger Docker Analysis
   echo "Triggering analysis in Docker container: ${DOCKER_CONTAINER_NAME}..."
   
-  sudo docker exec "$DOCKER_CONTAINER_NAME" python3 /app/main.py \
+  readonly CONDA_PYTHON="/opt/conda/envs/tenukigo_pi/bin/python3"
+
+  sudo docker exec "$DOCKER_CONTAINER_NAME" $CONDA_PYTHON /app/main.py \
     --video "$DOCKER_VIDEO_DIR/$FINAL_NAME" \
     --output "$DOCKER_SGF_DIR/$FINAL_SGF" \
     --yolo-model "$DOCKER_MODELS_DIR/model.pt" \

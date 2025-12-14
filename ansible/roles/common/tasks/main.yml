@@ -25,3 +25,6 @@
     content: "options brcmfmac feature_disable=0x82000"
     mode: '0644'
   notify: Reboot System
+
+- name: Configure Auto-Login
+  import_tasks: autologin.yml

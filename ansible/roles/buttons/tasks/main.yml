@@ -1,0 +1,31 @@
+---
+- name: Install GPIO dependencies
+  apt:
+    name:
+      - python3-gpiozero
+      - python3-rpi.gpio
+      - python3-rpi-lgpio
+    state: present
+
+- name: Copy GPIO Controller script
+  copy:
+    src: gpio_controller.py
+    dest: "{{ scripts_dir }}/gpio_controller.py"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  # notify: Restart GPIO Service
+
+- name: Disable and Stop GPIO Service (Legacy)
+  systemd:
+    name: gpio-controller
+    enabled: no
+    state: stopped
+  ignore_errors: true
+
+- name: Configure .bashrc to launch GPIO script at login
+  lineinfile:
+    path: "/home/{{ ansible_user }}/.bashrc"
+    line: 'if ! pgrep -f "gpio_controller.py" > /dev/null; then nohup python3 {{ scripts_dir }}/gpio_controller.py > {{ scripts_dir }}/../gpio.log 2>&1 & fi'
+    create: yes
+

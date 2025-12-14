@@ -11,13 +11,32 @@ readonly STREAM_CONFIG_FILE="${VIDEO_DIR}/../stream_config.txt"
 readonly DEFAULT_RTMP_URL="rtmp://172.20.10.3:1935/live/1"
 
 get_rtmp_url() {
+  echo "DEBUG: Looking for config at ${STREAM_CONFIG_FILE}" >&2
   if [[ -f "${STREAM_CONFIG_FILE}" ]]; then
+    echo "DEBUG: File exists." >&2
+    ls -l "${STREAM_CONFIG_FILE}" >&2
+    echo "DEBUG: Content:" >&2
+    cat "${STREAM_CONFIG_FILE}" >&2
+    echo "DEBUG: End content" >&2
+    
     # Read the first line of the config file
     local url
     url=$(head -n 1 "${STREAM_CONFIG_FILE}")
-    # Trim whitespace
-    echo "${url}" | xargs
+    echo "DEBUG: Raw URL read: '${url}'" >&2
+    
+    # Trim whitespace (remove all whitespace characters)
+    local trimmed_url
+    trimmed_url=$(echo "${url}" | tr -d '[:space:]')
+    echo "DEBUG: Trimmed URL: '${trimmed_url}'" >&2
+    
+    if [[ -n "${trimmed_url}" ]]; then
+        echo "${trimmed_url}"
+    else
+        echo "DEBUG: URL empty after trim. Using default." >&2
+        echo "${DEFAULT_RTMP_URL}"
+    fi
   else
+    echo "Warning: Config file not found at ${STREAM_CONFIG_FILE}. Using default." >&2
     echo "${DEFAULT_RTMP_URL}"
   fi
 }

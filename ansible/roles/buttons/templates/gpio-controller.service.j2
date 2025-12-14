@@ -1,0 +1,13 @@
+[Unit]
+Description=TenukiGo GPIO Button Controller
+After=multi-user.target network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 {{ scripts_dir }}/gpio_controller.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

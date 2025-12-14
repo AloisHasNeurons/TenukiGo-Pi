@@ -21,6 +21,7 @@ AP_GATEWAY_IP = "10.0.0.1"
 
 # Paths configured by Ansible
 VIDEO_DIR = "{{ videos_dir }}"
+SGF_DIR = "{{ sgf_dir }}"
 STREAM_CONFIG_FILE = os.path.join(VIDEO_DIR, "../stream_config.txt")
 
 {% raw %}
@@ -29,10 +30,12 @@ class WifiConfigHandler(http.server.SimpleHTTPRequestHandler):
     
     Attributes:
         video_extensions: Tuple of allowed video file extensions.
+        sgf_extensions: Tuple of allowed SGF file extensions.
         static_extensions: Tuple of allowed static file extensions.
     """
     
     video_extensions = ('.h264', '.mp4', '.mkv')
+    sgf_extensions = ('.sgf',)
     static_extensions = ('.css', '.js', '.png', '.ico')
 
     def _get_video_list_html(self) -> str:
@@ -44,6 +47,16 @@ class WifiConfigHandler(http.server.SimpleHTTPRequestHandler):
             return "".join([f'<li><a href="{f}">{f}</a></li>' for f in files])
         except FileNotFoundError:
             return "<li>Video directory not found.</li>"
+
+    def _get_sgf_list_html(self) -> str:
+        """Generates the HTML list of SGF files found in SGF_DIR."""
+        try:
+            files = [f for f in os.listdir(SGF_DIR) if f.endswith(self.sgf_extensions)]
+            if not files:
+                return "<li>No SGF files found.</li>"
+            return "".join([f'<li><a href="/sgf/{f}">{f}</a></li>' for f in files])
+        except FileNotFoundError:
+            return "<li>SGF directory not found.</li>"
 
     def _get_current_stream_url(self) -> str:
         """Reads the current RTMP URL from the config file."""
@@ -58,8 +71,8 @@ class WifiConfigHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
         """Handles GET requests. 
         
-        Serves the configuration page for the root path, serves specific 
-        static files, or redirects to the Captive Portal for all other requests.
+        Serves the configuration page, static files, specific SGF files, 
+        or redirects to the Captive Portal for all other requests.
         """
         if self.path == '/':
             self.send_response(200)
@@ -67,6 +80,7 @@ class WifiConfigHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
 
             files_html = self._get_video_list_html()
+            sgf_html = self._get_sgf_list_html()
             current_stream_url = self._get_current_stream_url()
 
             html_content = f"""
@@ -98,6 +112,11 @@ class WifiConfigHandler(http.server.SimpleHTTPRequestHandler):
                     <ul>{files_html}</ul>
                 </div>
 
+                <div class="video-list" style="margin-top: 20px;">
+                    <h2>Generated SGFs</h2>
+                    <ul>{sgf_html}</ul>
+                </div>
+
                 <div>
                     <h2>Streaming Setup</h2>
                     <form method="POST">
@@ -125,6 +144,22 @@ class WifiConfigHandler(http.server.SimpleHTTPRequestHandler):
             </html>
             """
             self.wfile.write(html_content.encode('utf-8'))
+
+        elif self.path.startswith('/sgf/'):
+            # Manually serve SGF file from the SGF_DIR
+            filename = os.path.basename(self.path)
+            file_path = os.path.join(SGF_DIR, filename)
+
+            # Security check: ensure the file is actually inside SGF_DIR
+            if os.path.commonpath([file_path, SGF_DIR]) == SGF_DIR and os.path.exists(file_path):
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/x-go-sgf')
+                self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
+                self.end_headers()
+                with open(file_path, 'rb') as f:
+                    self.wfile.write(f.read())
+            else:
+                self.send_error(404, "File not found")
 
         elif self.path.endswith(self.video_extensions + self.static_extensions):
             # Serve allowed static files normally (uses SimpleHTTPRequestHandler logic)
@@ -176,6 +211,15 @@ class WifiConfigHandler(http.server.SimpleHTTPRequestHandler):
         """Saves the RTMP URL to a file."""
         with open(STREAM_CONFIG_FILE, "w") as f:
             f.write(url)
+        
+        # Ensure the file is readable by the user (who runs the streaming script)
+        try:
+            os.chmod(STREAM_CONFIG_FILE, 0o644)
+            # Match ownership with the video directory (owned by the user)
+            stat_info = os.stat(VIDEO_DIR)
+            os.chown(STREAM_CONFIG_FILE, stat_info.st_uid, stat_info.st_gid)
+        except Exception as e:
+            print(f"Warning: Could not set permissions/ownership on config file: {e}")
 
     def _save_wifi_configuration(self, ssid: str, password: str) -> None:
         """Writes the NetworkManager keyfile for the specified connection.

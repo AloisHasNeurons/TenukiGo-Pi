@@ -1,47 +1,46 @@
 FROM python:3.10-slim-bookworm
 
+# 1. Install ONLY minimal system libraries
+# We need libglib2.0-0 for some OpenCV internal dependencies, even in headless mode.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     bzip2 \
     ca-certificates \
-    gpg \
-    && \
-    curl -fsSL https://archive.raspberrypi.org/debian/raspberrypi.gpg.key | \
-    gpg --dearmor -o /usr/share/keyrings/raspberrypi-archive-keyring.gpg \
-    && \
-    echo "deb [signed-by=/usr/share/keyrings/raspberrypi-archive-keyring.gpg] http://archive.raspberrypi.org/debian/ bookworm main" | \
-    tee /etc/apt/sources.list.d/raspi.list \
-    && \
-    apt-get update && apt-get install -y --no-install-recommends \
-    rpicam-apps \
-    ffmpeg \
-    v4l-utils \
-    libgl1-mesa-glx \
     libglib2.0-0 \
+    libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
+# 2. Install Micromamba
 RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-aarch64/latest | tar -xj -C /usr/local/bin/ --strip-components=1 bin/micromamba
 
 WORKDIR /app
 COPY environment.yml /app/
 
-# FIX FOR QEMU HANGS: Force single-threaded extraction
+# FIX FOR QEMU HANGS (Prevents freezing during build)
 ENV MAMBA_EXTRACT_THREADS=1
 
-# Create the environment 'tenukigo_pi'
+# 3. Create Environment
 ENV MAMBA_ROOT_PREFIX=/opt/conda
 RUN micromamba create -y -f environment.yml && \
     micromamba clean --all --yes
-ENV PATH="/opt/conda/envs/tenukigo_pi/bin:$PATH"
 
+# 4. Set Up Environment Variables
+# We define the path explicitly so we can use it for pip installation below
+ENV CONDA_ENV_PATH="/opt/conda/envs/tenukigo_pi"
+ENV PATH="$CONDA_ENV_PATH/bin:$PATH"
+
+# 5. Install Application
+# CRITICAL: We use "$CONDA_ENV_PATH/bin/pip" to guarantee libraries 
+# are installed into the Conda env, not the system python.
 COPY lib/ /app/lib/
-RUN pip install --no-cache-dir /app/lib/sente-*.whl
+RUN "$CONDA_ENV_PATH/bin/pip" install --no-cache-dir /app/lib/sente-*.whl
 
 COPY pyproject.toml README.md /app/
 COPY main.py /app/
 COPY src/ /app/src/
 
-RUN pip install --no-cache-dir .
+# Install the app itself
+RUN "$CONDA_ENV_PATH/bin/pip" install --no-cache-dir .
 
 COPY models/ /app/models/
 

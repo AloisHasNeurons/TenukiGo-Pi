@@ -21,7 +21,9 @@ PORT = 80
 AP_GATEWAY_IP = "10.0.0.1"
 
 # Paths configured by Ansible
+# Paths configured by Ansible
 VIDEO_DIR = "{{ videos_dir }}"
+STREAM_CONFIG_FILE = os.path.join(VIDEO_DIR, "../stream_config.txt")
 
 {% raw %}
 class WifiConfigHandler(http.server.SimpleHTTPRequestHandler):
@@ -45,6 +47,16 @@ class WifiConfigHandler(http.server.SimpleHTTPRequestHandler):
         except FileNotFoundError:
             return "<li>Video directory not found.</li>"
 
+    def _get_current_stream_url(self) -> str:
+        """Reads the current RTMP URL from the config file."""
+        try:
+            if os.path.exists(STREAM_CONFIG_FILE):
+                with open(STREAM_CONFIG_FILE, 'r') as f:
+                    return f.read().strip()
+        except Exception:
+            pass
+        return "rtmp://172.20.10.3:1935/live/1"
+
     def do_GET(self) -> None:
         """Handles GET requests. 
         
@@ -57,6 +69,7 @@ class WifiConfigHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
 
             files_html = self._get_video_list_html()
+            current_stream_url = self._get_current_stream_url()
 
             html_content = f"""
             <!DOCTYPE html>
@@ -88,8 +101,19 @@ class WifiConfigHandler(http.server.SimpleHTTPRequestHandler):
                 </div>
 
                 <div>
+                    <h2>Streaming Setup</h2>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="stream">
+                        <label for="stream_url">RTMP URL</label>
+                        <input type="text" id="stream_url" name="stream_url" value="{current_stream_url}" required>
+                        <button type="submit">Update Stream URL</button>
+                    </form>
+                </div>
+
+                <div>
                     <h2>Wi-Fi Setup</h2>
                     <form method="POST">
+                        <input type="hidden" name="action" value="wifi">
                         <label for="ssid">Network Name (SSID)</label>
                         <input type="text" id="ssid" name="ssid" placeholder="e.g. MyHomeNetwork" required>
                         
@@ -115,28 +139,45 @@ class WifiConfigHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self) -> None:
-        """Handles POST requests to save Wi-Fi credentials."""
+        """Handles POST requests to save credentials or streaming config."""
         try:
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length).decode('utf-8')
             params = urllib.parse.parse_qs(post_data)
 
-            ssid_list = params.get('ssid')
-            password_list = params.get('password')
+            action_list = params.get('action')
+            action = action_list[0] if action_list else 'wifi' # Default to wifi for backward compatibility
 
-            if not ssid_list or not password_list:
-                self.send_error(400, "Missing SSID or Password fields.")
-                return
+            if action == 'stream':
+                stream_url_list = params.get('stream_url')
+                if stream_url_list:
+                    self._save_stream_configuration(stream_url_list[0])
+                    self._send_success_response("Streaming URL Updated", "The new stream URL has been saved.")
+                else:
+                    self.send_error(400, "Missing Stream URL.")
 
-            ssid = ssid_list[0]
-            password = password_list[0]
+            elif action == 'wifi':
+                ssid_list = params.get('ssid')
+                password_list = params.get('password')
 
-            self._save_wifi_configuration(ssid, password)
-            self._send_success_response()
-            self._reboot_system()
+                if not ssid_list or not password_list:
+                    self.send_error(400, "Missing SSID or Password fields.")
+                    return
+
+                self._save_wifi_configuration(ssid_list[0], password_list[0])
+                self._send_success_response("Configuration Saved", "The device is rebooting to apply the new settings.")
+                self._reboot_system()
+
+            else:
+                 self.send_error(400, f"Unknown action: {action}")
 
         except Exception as e:
             self.send_error(500, f"Internal Server Error: {str(e)}")
+
+    def _save_stream_configuration(self, url: str) -> None:
+        """Saves the RTMP URL to a file."""
+        with open(STREAM_CONFIG_FILE, "w") as f:
+            f.write(url)
 
     def _save_wifi_configuration(self, ssid: str, password: str) -> None:
         """Writes the NetworkManager keyfile for the specified connection.
@@ -177,18 +218,18 @@ method=auto
         # NetworkManager requires strict permissions (600) for secrets.
         os.chmod(filename, 0o600)
 
-    def _send_success_response(self) -> None:
+    def _send_success_response(self, title: str, message: str) -> None:
         """Sends a success HTML page to the user."""
         self.send_response(200)
         self.send_header('Content-Type', 'text/html; charset=utf-8')
         self.end_headers()
-        response_html = """
+        response_html = f"""
         <!DOCTYPE html>
         <html>
         <body style="font-family: sans-serif; padding: 40px; text-align: center;">
-            <h1 style="color: green;">Configuration Saved.</h1>
-            <p>The device is rebooting to apply the new settings.</p>
-            <p>Please reconnect your device to the new Wi-Fi network.</p>
+            <h1 style="color: green;">{title}</h1>
+            <p>{message}</p>
+            <p><a href="/">Return to Home</a></p>
         </body>
         </html>
         """

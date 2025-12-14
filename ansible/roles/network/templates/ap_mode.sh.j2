@@ -12,18 +12,28 @@ readonly PASS="{{ wifi_password }}"
 readonly AP_IP="{{ ap_ip_address }}"
 readonly LOG_FILE="${VIDEO_DIR}/../go_http.log"
 
-# Stops services that might interfere with AP mode.
+# --- HELPER FUNCTIONS ---
+
 stop_client_services() {
-  # Stop NetworkManager to release control of the wlan0 interface.
+  echo "Stopping Client Services..."
+  # Disable NetworkManager so it doesn't conflict
   systemctl stop NetworkManager 2>/dev/null || true
+  systemctl disable NetworkManager 2>/dev/null || true
   
-  # Ensure wpa_supplicant is stopped and does not automatically restart.
+  # Kill wpa_supplicant to free up the wifi device for hostapd
   systemctl stop wpa_supplicant 2>/dev/null || true
   killall wpa_supplicant 2>/dev/null || true
+  sleep 2
 }
 
-# Configures the wlan0 interface with a static IP address.
 configure_interface() {
+  echo "Configuring Interface..."
+  
+  modprobe -r brcmfmac
+  sleep 1
+  modprobe brcmfmac roamoff=1
+  sleep 2
+
   rfkill unblock wlan
   ip link set wlan0 down
   ip addr flush dev wlan0
@@ -31,11 +41,10 @@ configure_interface() {
   ip link set wlan0 up
 }
 
-# Enables and starts AP-related services.
 start_ap_services() {
+  echo "Starting AP Services..."
   systemctl unmask hostapd dnsmasq
   
-  # Enable services to ensure persistence if the device reboots in this mode.
   systemctl enable dnsmasq 2>/dev/null || true
   systemctl enable hostapd 2>/dev/null || true
   
@@ -43,18 +52,15 @@ start_ap_services() {
   systemctl restart hostapd
 }
 
-# Starts the custom Python HTTP server for WiFi configuration.
 start_config_server() {
-  # Terminate any existing instances to prevent port conflicts.
+  echo "Starting Config Server..."
   pkill -f "python3 -m http.server" 2>/dev/null || true
   pkill -f "server_wifi.py" 2>/dev/null || true
 
-  # Launch the server in the background.
   nohup python3 "${SCRIPTS_DIR}/server_wifi.py" > "${LOG_FILE}" 2>&1 &
 }
 
 main() {
-  # Ensure the script is run with sudo
   if [[ $EUID -ne 0 ]]; then
      echo "This script must be run as root" 
      exit 1
@@ -67,7 +73,6 @@ main() {
 
   echo "AP Mode successfully activated."
   echo "SSID: ${SSID}"
-  echo "Password: ${PASS}"
   echo "Web Configuration: http://${AP_IP}"
 }
 

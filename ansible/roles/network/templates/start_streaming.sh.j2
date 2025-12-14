@@ -1,0 +1,50 @@
+#!/bin/bash
+# Captures video from the camera and streams it to an RTMP server (e.g., YouTube Live).
+#
+# Reads the RTMP URL from a configuration file managed by the web server.
+
+set -euo pipefail
+
+# Configuration
+readonly VIDEO_DIR="{{ videos_dir }}"
+readonly STREAM_CONFIG_FILE="${VIDEO_DIR}/../stream_config.txt"
+readonly DEFAULT_RTMP_URL="rtmp://172.20.10.3:1935/live/1"
+
+get_rtmp_url() {
+  if [[ -f "${STREAM_CONFIG_FILE}" ]]; then
+    # Read the first line of the config file
+    local url
+    url=$(head -n 1 "${STREAM_CONFIG_FILE}")
+    # Trim whitespace
+    echo "${url}" | xargs
+  else
+    echo "${DEFAULT_RTMP_URL}"
+  fi
+}
+
+main() {
+  local rtmp_url
+  rtmp_url=$(get_rtmp_url)
+
+  if [[ -z "${rtmp_url}" ]]; then
+    echo "Error: RTMP URL is empty. Please configure it via the web interface." >&2
+    exit 1
+  fi
+
+  echo "Starting stream to: ${rtmp_url}"
+
+  # Streaming Pipeline
+  # rpicam-vid: Captures raw h264 stream
+  # ffmpeg: Packages it into FLV for RTMP
+  rpicam-vid --width 640 --height 360 --framerate 20 -o - --inline -t 0 -n \
+    --codec libav --libav-format h264 --bitrate 1000000 | \
+  ffmpeg -re -fflags +genpts \
+    -i - -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 \
+    -c:v libx264 -preset ultrafast -tune zerolatency \
+    -b:v 1000k -maxrate 1000k -bufsize 2000k \
+    -g 40 -keyint_min 20 \
+    -c:a aac -b:a 64k -ar 44100 \
+    -f flv "${rtmp_url}"
+}
+
+main "$@"

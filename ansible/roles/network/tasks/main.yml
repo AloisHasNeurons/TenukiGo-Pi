@@ -73,26 +73,40 @@
     group: "{{ ansible_user }}"
     mode: '0755'
 
-- name: Copy YouTube broadcast script
-  copy:
-    src: youtube_live.sh
-    dest: "{{ scripts_dir }}/youtube_live.sh"
+- name: Deploy streaming script (start_streaming.sh)
+  template:
+    src: start_streaming.sh.j2
+    dest: "{{ scripts_dir }}/start_streaming.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
 
-- name: Copy CLIENT mode network script (v2)
+- name: Remove legacy streaming script (youtube_live.sh)
+  file:
+    path: "{{ scripts_dir }}/youtube_live.sh"
+    state: absent
+
+- name: Ensure default stream config exists
+  lineinfile:
+    path: "{{ videos_dir }}/../stream_config.txt"
+    line: "rtmp://172.20.10.3:1935/live/1"
+    create: yes
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+
+
+- name: Copy CLIENT mode network script
   template:
-    src: net_mode_client_v2.sh.j2
-    dest: "{{ scripts_dir }}/net_mode_client_v2.sh"
+    src: client_mode.sh.j2
+    dest: "{{ scripts_dir }}/client_mode.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
 
-- name: Copy AP mode network script (v2)
+- name: Copy AP mode network script
   template:
-    src: net_mode_ap_v2.sh.j2
-    dest: "{{ scripts_dir }}/net_mode_ap_v2.sh"
+    src: ap_mode.sh.j2
+    dest: "{{ scripts_dir }}/ap_mode.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'

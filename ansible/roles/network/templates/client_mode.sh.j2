@@ -30,6 +30,7 @@ restore_interface() {
 start_client_services() {
   # NetworkManager will automatically manage wpa_supplicant.
   # Explicitly starting wpa_supplicant is unnecessary and may cause conflicts.
+  systemctl enable NetworkManager 2>/dev/null || true
   systemctl start NetworkManager 2>/dev/null || true
 }
 

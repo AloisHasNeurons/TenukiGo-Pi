@@ -1,4 +1,4 @@
-# TenukiGo-Pi (IoT & IaC Migration)
+# TenukiGo-Pi (IoT & IaC)
 
 TenukiGo-Pi is a fully containerized IoT system for recording and analyzing Go (Weiqi/Baduk) games on a Raspberry Pi. It leverages Computer Vision (YOLO + CNN) to digitize real-world games into SGF format automatically.
 

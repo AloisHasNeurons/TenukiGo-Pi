@@ -1,0 +1,51 @@
+#!/bin/bash
+# Reverts the network configuration to Client Mode.
+# Stops AP services and hands control of the interface back to NetworkManager.
+
+set -euo pipefail
+
+# Stops the custom WiFi configuration server.
+stop_config_server() {
+  pkill -f "python3 -m http.server" 2>/dev/null || true
+  pkill -f "server_wifi.py" 2>/dev/null || true
+}
+
+# Stops and disables Access Point services.
+stop_ap_services() {
+  # Disabling is crucial to prevent conflict with NetworkManager upon reboot.
+  systemctl stop hostapd 2>/dev/null || true
+  systemctl disable hostapd 2>/dev/null || true
+  
+  systemctl stop dnsmasq 2>/dev/null || true
+  systemctl disable dnsmasq 2>/dev/null || true
+}
+
+# Restores the network interface for client use.
+restore_interface() {
+  ip addr flush dev wlan0
+  rfkill unblock wlan
+}
+
+# Starts NetworkManager to manage connections.
+start_client_services() {
+  # NetworkManager will automatically manage wpa_supplicant.
+  # Explicitly starting wpa_supplicant is unnecessary and may cause conflicts.
+  systemctl start NetworkManager 2>/dev/null || true
+}
+
+main() {
+  # Ensure the script is run with sudo
+  if [[ $EUID -ne 0 ]]; then
+     echo "This script must be run as root" 
+     exit 1
+  fi
+
+  stop_config_server
+  stop_ap_services
+  restore_interface
+  start_client_services
+
+  echo "Client Mode successfully activated. NetworkManager controls the interface."
+}
+
+main "$@"

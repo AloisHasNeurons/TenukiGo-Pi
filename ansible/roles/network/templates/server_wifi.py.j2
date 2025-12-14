@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+"""Custom HTTP Server for TenukiGo-Pi Wi-Fi Configuration.
+
+This script launches a simple HTTP server to allow users to configure
+the Wi-Fi credentials of the Raspberry Pi when in Access Point mode.
+It also implements a Captive Portal mechanism to redirect users to
+the configuration page automatically.
+"""
+
+import http.server
+import socketserver
+import urllib.parse
+import subprocess
+import os
+import uuid
+import sys
+from typing import List
+
+# Server Configuration
+PORT = 80
+AP_GATEWAY_IP = "10.0.0.1"
+
+# Paths configured by Ansible
+VIDEO_DIR = "{{ videos_dir }}"
+
+{% raw %}
+class WifiConfigHandler(http.server.SimpleHTTPRequestHandler):
+    """Handles HTTP requests for Wi-Fi configuration and file serving.
+    
+    Attributes:
+        video_extensions: Tuple of allowed video file extensions.
+        static_extensions: Tuple of allowed static file extensions.
+    """
+    
+    video_extensions = ('.h264', '.mp4', '.mkv')
+    static_extensions = ('.css', '.js', '.png', '.ico')
+
+    def _get_video_list_html(self) -> str:
+        """Generates the HTML list of video files found in VIDEO_DIR."""
+        try:
+            files = [f for f in os.listdir(VIDEO_DIR) if f.endswith(self.video_extensions)]
+            if not files:
+                return "<li>No video files found.</li>"
+            return "".join([f'<li><a href="{f}">{f}</a></li>' for f in files])
+        except FileNotFoundError:
+            return "<li>Video directory not found.</li>"
+
+    def do_GET(self) -> None:
+        """Handles GET requests. 
+        
+        Serves the configuration page for the root path, serves specific 
+        static files, or redirects to the Captive Portal for all other requests.
+        """
+        if self.path == '/':
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.end_headers()
+
+            files_html = self._get_video_list_html()
+
+            html_content = f"""
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <title>TenukiGo Configuration</title>
+                <style>
+                    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; color: #333; }}
+                    h1 {{ margin-bottom: 20px; }}
+                    h2 {{ border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-top: 30px; }}
+                    input {{ width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }}
+                    button {{ background-color: #007bff; color: white; padding: 14px 20px; border: none; border-radius: 4px; width: 100%; font-size: 16px; cursor: pointer; }}
+                    button:hover {{ background-color: #0056b3; }}
+                    .video-list {{ background-color: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #eee; }}
+                    ul {{ padding-left: 20px; }}
+                    li {{ margin-bottom: 5px; }}
+                    a {{ text-decoration: none; color: #007bff; }}
+                    a:hover {{ text-decoration: underline; }}
+                </style>
+            </head>
+            <body>
+                <h1>TenukiGo-Pi</h1>
+                
+                <div class="video-list">
+                    <h2>Recorded Videos</h2>
+                    <ul>{files_html}</ul>
+                </div>
+
+                <div>
+                    <h2>Wi-Fi Setup</h2>
+                    <form method="POST">
+                        <label for="ssid">Network Name (SSID)</label>
+                        <input type="text" id="ssid" name="ssid" placeholder="e.g. MyHomeNetwork" required>
+                        
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" placeholder="Network Security Key" required>
+                        
+                        <button type="submit">Save and Reboot</button>
+                    </form>
+                </div>
+            </body>
+            </html>
+            """
+            self.wfile.write(html_content.encode('utf-8'))
+
+        elif self.path.endswith(self.video_extensions + self.static_extensions):
+            # Serve allowed static files normally (uses SimpleHTTPRequestHandler logic)
+            super().do_GET()
+            
+        else:
+            # Captive Portal: Redirect any other request (e.g. connectivity checks) to the gateway
+            self.send_response(302)
+            self.send_header('Location', f'http://{AP_GATEWAY_IP}/')
+            self.end_headers()
+
+    def do_POST(self) -> None:
+        """Handles POST requests to save Wi-Fi credentials."""
+        try:
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            params = urllib.parse.parse_qs(post_data)
+
+            ssid_list = params.get('ssid')
+            password_list = params.get('password')
+
+            if not ssid_list or not password_list:
+                self.send_error(400, "Missing SSID or Password fields.")
+                return
+
+            ssid = ssid_list[0]
+            password = password_list[0]
+
+            self._save_wifi_configuration(ssid, password)
+            self._send_success_response()
+            self._reboot_system()
+
+        except Exception as e:
+            self.send_error(500, f"Internal Server Error: {str(e)}")
+
+    def _save_wifi_configuration(self, ssid: str, password: str) -> None:
+        """Writes the NetworkManager keyfile for the specified connection.
+        
+        Args:
+            ssid: The Wi-Fi SSID.
+            password: The Wi-Fi password.
+            
+        Raises:
+            IOError: If writing the configuration file fails.
+        """
+        conn_uuid = str(uuid.uuid4())
+        filename = f"/etc/NetworkManager/system-connections/{ssid}.nmconnection"
+        
+        config_content = f"""[connection]
+id={ssid}
+uuid={conn_uuid}
+type=wifi
+interface-name=wlan0
+
+[wifi]
+mode=infrastructure
+ssid={ssid}
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk={password}
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
+"""
+        with open(filename, "w") as f:
+            f.write(config_content)
+        
+        # NetworkManager requires strict permissions (600) for secrets.
+        os.chmod(filename, 0o600)
+
+    def _send_success_response(self) -> None:
+        """Sends a success HTML page to the user."""
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.end_headers()
+        response_html = """
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: sans-serif; padding: 40px; text-align: center;">
+            <h1 style="color: green;">Configuration Saved.</h1>
+            <p>The device is rebooting to apply the new settings.</p>
+            <p>Please reconnect your device to the new Wi-Fi network.</p>
+        </body>
+        </html>
+        """
+        self.wfile.write(response_html.encode('utf-8'))
+
+    def _reboot_system(self) -> None:
+        """Triggers a system reboot."""
+        # Using subprocess.Popen allows the response to be sent before the script dies.
+        subprocess.Popen(["reboot"])
+
+
+def main() -> None:
+    """Starts the TCP server."""
+    # Ensure we serve files from the correct directory for SimpleHTTPRequestHandler
+    if os.path.exists(VIDEO_DIR):
+        os.chdir(VIDEO_DIR)
+        
+    with socketserver.TCPServer(("", PORT), WifiConfigHandler) as httpd:
+        print(f"Starting Wi-Fi configuration server on port {PORT}...")
+        print(f"Serving video files from: {VIDEO_DIR}")
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\nShutting down server.")
+            httpd.server_close()
+
+if __name__ == "__main__":
+    main()
+{% endraw %}

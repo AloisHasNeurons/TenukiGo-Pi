@@ -1,0 +1,74 @@
+#!/bin/bash
+# Switches the network interface to Access Point (AP) mode.
+# Configures static IP, starts DHCP/Hostapd services, and launches the config server.
+
+set -euo pipefail
+
+# Ansible configurations
+readonly VIDEO_DIR="{{ videos_dir }}"
+readonly SCRIPTS_DIR="{{ scripts_dir }}"
+readonly SSID="{{ wifi_ssid }}"
+readonly PASS="{{ wifi_password }}"
+readonly AP_IP="{{ ap_ip_address }}"
+readonly LOG_FILE="${VIDEO_DIR}/../go_http.log"
+
+# Stops services that might interfere with AP mode.
+stop_client_services() {
+  # Stop NetworkManager to release control of the wlan0 interface.
+  systemctl stop NetworkManager 2>/dev/null || true
+  
+  # Ensure wpa_supplicant is stopped and does not automatically restart.
+  systemctl stop wpa_supplicant 2>/dev/null || true
+  killall wpa_supplicant 2>/dev/null || true
+}
+
+# Configures the wlan0 interface with a static IP address.
+configure_interface() {
+  rfkill unblock wlan
+  ip link set wlan0 down
+  ip addr flush dev wlan0
+  ip addr add "${AP_IP}/24" dev wlan0
+  ip link set wlan0 up
+}
+
+# Enables and starts AP-related services.
+start_ap_services() {
+  systemctl unmask hostapd dnsmasq
+  
+  # Enable services to ensure persistence if the device reboots in this mode.
+  systemctl enable dnsmasq 2>/dev/null || true
+  systemctl enable hostapd 2>/dev/null || true
+  
+  systemctl restart dnsmasq
+  systemctl restart hostapd
+}
+
+# Starts the custom Python HTTP server for WiFi configuration.
+start_config_server() {
+  # Terminate any existing instances to prevent port conflicts.
+  pkill -f "python3 -m http.server" 2>/dev/null || true
+  pkill -f "server_wifi.py" 2>/dev/null || true
+
+  # Launch the server in the background.
+  nohup python3 "${SCRIPTS_DIR}/server_wifi.py" > "${LOG_FILE}" 2>&1 &
+}
+
+main() {
+  # Ensure the script is run with sudo
+  if [[ $EUID -ne 0 ]]; then
+     echo "This script must be run as root" 
+     exit 1
+  fi
+
+  stop_client_services
+  configure_interface
+  start_ap_services
+  start_config_server
+
+  echo "AP Mode successfully activated."
+  echo "SSID: ${SSID}"
+  echo "Password: ${PASS}"
+  echo "Web Configuration: http://${AP_IP}"
+}
+
+main "$@"

@@ -12,7 +12,7 @@
   notify: Reboot Raspberry Pi
 
 - name: Enable Legacy Camera (fallback)
-  lineinfile::
+  lineinfile:
     path: /boot/config.txt
     regexp: '^start_x='
     line: 'start_x=1'
@@ -27,8 +27,8 @@
     mode: '0755'
 
 - name: Copy camera capture script
-  copy:
-    src: cam_go_script.sh
+  template:
+    src: cam_go_script.sh.j2
     dest: "{{ scripts_dir }}/cam_go_script.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"

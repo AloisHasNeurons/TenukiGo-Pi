@@ -13,7 +13,6 @@
     owner: root
     group: root
     mode: '0600'
-  notify: Restart hostapd
 
 - name: Point hostapd to configuration file
   lineinfile:
@@ -33,7 +32,6 @@
     owner: root
     group: root
     mode: '0644'
-  notify: Restart dnsmasq
 
 - name: Disable services at boot (managed by scripts)
   service:
@@ -44,6 +42,21 @@
     - hostapd
     - dnsmasq
 
+- name: Configure NetworkManager to ignore Docker interfaces
+  copy:
+    src: nm_docker_ignore.conf
+    dest: /etc/NetworkManager/conf.d/docker-ignore.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart NetworkManager
+
+- name: Ensure NetworkManager is started and enabled
+  service:
+    name: NetworkManager
+    state: started
+    enabled: yes
+
 - name: Create scripts directory
   file:
     path: "{{ scripts_dir }}"
@@ -53,8 +66,8 @@
     mode: '0755'
 
 - name: Copy Python Wifi Server
-  copy:
-    src: server_wifi.py
+  template:
+    src: server_wifi.py.j2
     dest: "{{ scripts_dir }}/server_wifi.py"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
@@ -69,17 +82,17 @@
     mode: '0755'
 
 - name: Copy CLIENT mode network script (v2)
-  copy:
-    src: net_mode_client_v2.sh
-    dest: "{{ scripts_dir }}/net_mode_client.sh"
+  template:
+    src: net_mode_client_v2.sh.j2
+    dest: "{{ scripts_dir }}/net_mode_client_v2.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
 
 - name: Copy AP mode network script (v2)
-  copy:
-    src: net_mode_ap_v2.sh
-    dest: "{{ scripts_dir }}/net_mode_ap.sh"
+  template:
+    src: net_mode_ap_v2.sh.j2
+    dest: "{{ scripts_dir }}/net_mode_ap_v2.sh"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'

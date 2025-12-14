@@ -1,7 +1,7 @@
 ---
 # Network Configuration
-wifi_ssid: "Go-Camera"
-wifi_password: "gocamera123"
+wifi_ssid: "TenukiGo-Pi"
+wifi_password: "123456"
 wifi_channel: 7
 wifi_country: "FR"
 wifi_interface: "wlan0"

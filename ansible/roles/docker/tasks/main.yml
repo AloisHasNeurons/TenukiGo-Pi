@@ -41,7 +41,7 @@
 
 - name: Start TenukiGo container
   docker_container:
-    name: tenukigo-app
+    name: "{{ docker_container_name }}"
     image: localhost/tenukigo-app:latest
     pull: missing
     state: started

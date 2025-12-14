@@ -1,82 +1,66 @@
 # TenukiGo Application
 
-Ceci est le code source de l'application TenukiGo. Il est conçu pour tourner :
-1.  **Sur Raspberry Pi** (via Docker + TFLite Runtime).
-2.  **Sur PC/Dev** (via Python + TensorFlow/Keras).
+This directory contains the source code for the core TenukiGo application. It is designed to run in two environments:
+1.  **Embedded (Raspberry Pi)**: via Docker + TensorFlow Lite Runtime.
+2.  **Development (PC/Mac)**: via Python + TensorFlow/Keras.
 
-## 📂 Structure
+## Structure
 
-*   `Dockerfile` : Définition de l'image de production (Raspberry Pi 3B+ / Arm64).
-*   `main.py` : Point d'entrée principal. Analyse une vidéo et génère un SGF.
-*   `src/` : Code source du package `tenukigo_pi`.
-*   `models/` : Modèles IA (YOLOv8 `.pt` et CNN `.tflite` / `.keras`).
-*   `scripts/` : Scripts Bash utilisés par l'image Docker (capture `rpicam-vid`).
-*   `lib/` : Roue `sente` compilée (dépendance C++ critique).
+*   `Dockerfile`: Production image definition (Debian Bookworm / Python 3.10).
+*   `main.py`: Main entry point. Pipelines video input -> YOLO Detection -> Stone Classification -> SGF Output.
+*   `src/`: The `tenukigo_pi` python package containing the Computer Vision logic.
+*   `models/`: Pre-trained models:
+    *   `model.pt`: YOLOv8 model for board detection.
+    *   `modelCNN.tflite` / `.keras`: CNN for stone classification.
+*   `lib/`: Pre-compiled wheels (e.g., `sente` C++ bindings).
 
 ---
 
-## 💻 Développement Local (PC/Mac)
+## Local Development
 
-Vous pouvez lancer l'analyse sur votre machine sans Docker pour débugger la logique de jeu ou de vision.
+You can run the analysis pipeline locally without Docker for debugging or model training.
 
-### 1. Installation de l'environnement
-Le projet utilise **Micromamba** (ou Conda) pour gérer les dépendances complexes (TensorFlow, PyTorch, OpenCV).
+### 1. Environment Setup
+We recommend using **Micromamba** (or Conda) to manage dependencies.
 
 ```bash
-# 1. Aller dans le dossier de l'application
-cd app
-
-# 2. Créer l'environnement à partir du fichier environment.yml
+# 1. Create environment from file
 micromamba env create -f environment.yml
 
-# 3. Activer l'environnement
+# 2. Activate environment
 micromamba activate tenukigo_pi
 
-# 4. Installer le package local en mode éditable
-# Cela permet de modifier le code dans src/ sans réinstaller
+# 3. Install the package in editable mode
 pip install -e .
 ```
-> **Note sur sente** : Si l'installation automatique de la librairie sente échoue (problème de compilation C++ fréquent), vous devrez peut-être installer le wheel pré-compilé manuellement ou suivre les instructions de compilation dans Dockerfile.build_sente.
 
-
-### 2. Lancer l'analyse
+### 2. Running Analysis
 ```bash
-# Analyse d'une vidéo MP4
 python main.py \
-  --video data/ma_partie.mp4 \
+  --video data/sample_game.mp4 \
   --output result.sgf \
   --yolo-model models/model.pt \
   --keras-model models/modelCNN.keras
 ```
-
-> **Note** : Sur PC, le script utilisera automatiquement TensorFlow/Keras (défini dans environment.yml). Sur Raspberry Pi, il basculera sur TFLite Runtime.
+> **Note**: The script automatically detects the runtime environment. On a PC, it uses the `.keras` model with full TensorFlow. On the Pi, it defaults to the `.tflite` model with the lightweight runtime.
 
 ---
 
-## 🐳 Docker (Production RPi)
+## Docker (Production Build)
 
-L'image Docker est optimisée pour la Raspberry Pi (Arm64).
+The Docker image is optimized for `linux/arm64`.
 
-### Build Manuel
+### Building the Image
+When moving to production or testing on the Pi, rebuild the image:
+
 ```bash
-# Depuis le dossier app/
 podman build --platform linux/arm64 -t tenukigo-app:latest .
 ```
 
-### Test Manuel (Sur RPi)
-```bash
-docker run -it --rm \
-  --device /dev/video0 \
-  -v $(pwd)/data:/app/go_videos \
-  tenukigo-app:latest \
-  /bin/bash
-```
+This image is then loaded onto the Raspberry Pi via the Ansible deployment pipeline.
 
----
-
-## 📜 Scripts
-
-*   `scripts/cam_go_script.sh` : Script "Chef d'orchestre" lancé par les boutons physiques.
-    1.  Lance `rpicam-vid` (enregistrement).
-    2.  Attend le signal `SIGINT` (Bouton Stop).
-    3.  Lance `main.py` pour analyser la vidéo capturée.
+### Integration with Infrastructure
+In production, this container is orchestrated by `scripts/cam_go_script.sh` (deployed on the host). The workflow is:
+1.  Host script captures video using `rpicam-vid`.
+2.  Host script mounts the video directory into the container.
+3.  Host script triggers `docker exec ... python3 /app/main.py`.

@@ -15,3 +15,13 @@
       - curl
       - ffmpeg
     state: present
+
+# --- Fix for Kernel 6.12 Crash ---
+- name: Apply brcmfmac driver workaround
+  # This fixes the NULL pointer dereference in Kernel 6.12+ 
+  # by disabling the specific offloading features that cause the crash.
+  copy:
+    dest: /etc/modprobe.d/brcmfmac.conf
+    content: "options brcmfmac feature_disable=0x82000"
+    mode: '0644'
+  notify: Reboot System

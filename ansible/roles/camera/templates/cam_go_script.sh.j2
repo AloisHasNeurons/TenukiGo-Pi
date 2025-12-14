@@ -1,0 +1,88 @@
+#!/bin/bash
+# Captures video from the camera, segments it, and triggers Docker-based analysis.
+#
+# This script is designed to be robust against interruptions (Ctrl+C).
+# It captures video in segments to ensure data persistence even if the process is killed.
+
+set -euo pipefail
+
+# --- CONFIGURATION FROM ANSIBLE ---
+readonly HOST_VIDEO_DIR="{{ videos_dir }}"
+readonly HOST_SGF_DIR="{{ sgf_dir }}"
+readonly DOCKER_CONTAINER_NAME="{{ docker_container_name }}"
+
+# --- DOCKER INTERNAL PATHS ---
+readonly DOCKER_VIDEO_DIR="/app/go_videos"
+readonly DOCKER_SGF_DIR="/app/output_sgf"
+readonly DOCKER_MODELS_DIR="/app/models"
+
+# --- SESSION VARIABLES ---
+readonly START_TS=$(date +"%Y-%m-%d_%H-%M-%S")
+readonly SESSION_PREFIX="tmp_${START_TS}_part_"
+readonly FINAL_NAME="go_${START_TS}.h264"
+readonly FINAL_SGF="go_${START_TS}.sgf"
+
+# Finalizes the session: concatenates video segments and triggers analysis.
+finalize() {
+  echo ""
+  echo "Finalizing session..."
+  
+  if ! cd "$HOST_VIDEO_DIR"; then
+    echo "Error: Could not access video directory." >&2
+    exit 1
+  fi
+
+  # 1. Concatenate segments
+  if ls ${SESSION_PREFIX}*.h264 1>/dev/null 2>&1; then
+    echo "Concatenating video segments..."
+    cat ${SESSION_PREFIX}*.h264 > "$FINAL_NAME"
+    rm ${SESSION_PREFIX}*.h264
+    echo "Video assembled: ${HOST_VIDEO_DIR}/${FINAL_NAME}"
+  else
+    echo "Error: No video segments found." >&2
+    exit 1
+  fi
+
+  # 2. Trigger Docker Analysis
+  echo "Triggering analysis in Docker container: ${DOCKER_CONTAINER_NAME}..."
+  
+  sudo docker exec "$DOCKER_CONTAINER_NAME" python3 /app/main.py \
+    --video "$DOCKER_VIDEO_DIR/$FINAL_NAME" \
+    --output "$DOCKER_SGF_DIR/$FINAL_SGF" \
+    --yolo-model "$DOCKER_MODELS_DIR/model.pt" \
+    --keras-model "$DOCKER_MODELS_DIR/modelCNN.tflite" \
+    --transparent
+
+  # 3. Verify Output
+  if [[ -f "${HOST_SGF_DIR}/${FINAL_SGF}" ]]; then
+      echo "Success: SGF generated at ${HOST_SGF_DIR}/${FINAL_SGF}"
+  else
+      echo "Error: SGF file was not created." >&2
+  fi
+  
+  exit 0
+}
+
+main() {
+  mkdir -p "$HOST_VIDEO_DIR"
+  mkdir -p "$HOST_SGF_DIR"
+
+  echo "Starting Recording..."
+  echo "Output File: ${HOST_VIDEO_DIR}/${FINAL_NAME}"
+
+  # Intercept SIGINT (Ctrl+C) and SIGTERM
+  trap finalize INT TERM
+
+  # Start recording pipeline
+  # rpicam-vid: Captures raw video from camera
+  # ffmpeg: Segments the stream into 10s chunks for safety
+  rpicam-vid --width 1280 --height 720 --framerate 25 --inline -t 0 -o - | \
+  ffmpeg -re -f h264 -i - -c:v copy -f segment -segment_time 10 \
+         -reset_timestamps 1 -segment_format h264 \
+         "${HOST_VIDEO_DIR}/${SESSION_PREFIX}%03d.h264" || true
+  
+  # Ensure finalize is called if the pipeline breaks naturally
+  finalize
+}
+
+main "$@"
